@@ -12,7 +12,7 @@
         },
         "message":{
           "type":"string"
-        }        
+        }
       }
     }
   },

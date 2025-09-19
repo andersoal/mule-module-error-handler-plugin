@@ -1,94 +1,93 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
-	<groupId>ORG_ID_TOKEN</groupId>
-	<artifactId>api-error-handler</artifactId>
-	<version>6.3.0</version>
-	<packaging>mule-extension</packaging>
+    <groupId>ORG_ID_TOKEN</groupId>
+    <artifactId>api-error-handler</artifactId>
+    <version>6.3.0</version>
+    <packaging>mule-extension</packaging>
 
-	<name>API Error Handler</name>
-	<description>Provides standard REST API error responses</description>
+    <name>API Error Handler</name>
+    <description>Provides standard REST API error responses</description>
 
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-		<!-- Overridden by build.sh -->
-		<repo.id>Exchange2</repo.id>
-		<repo.url>https://maven.anypoint.mulesoft.com/api/v1/organizations/${project.groupId}/maven</repo.url>
+        <!-- Overridden by build.sh -->
+        <repo.id>Exchange2</repo.id>
+        <repo.url>https://maven.anypoint.mulesoft.com/api/v1/organizations/${project.groupId}/maven</repo.url>
 
-		<!-- XML SDK properties -->
-		<mule.version>4.6.0</mule.version>
-		<mule.extensions.maven.plugin.version>1.6.1</mule.extensions.maven.plugin.version>
-		<app.runtime>4.6.0</app.runtime>
-	</properties>
+        <!-- XML SDK properties -->
+        <mule.version>4.6.0</mule.version>
+        <mule.extensions.maven.plugin.version>1.6.1</mule.extensions.maven.plugin.version>
+        <app.runtime>4.6.0</app.runtime>
+    </properties>
 
-	<distributionManagement>
-		<repository>
-			<id>${repo.id}</id>
-			<name>Deployment Repo</name>
-			<url>${repo.url}</url>
-			<layout>default</layout>
-		</repository>
-	</distributionManagement>
+    <distributionManagement>
+        <repository>
+            <id>${repo.id}</id>
+            <name>Deployment Repo</name>
+            <url>${repo.url}</url>
+            <layout>default</layout>
+        </repository>
+    </distributionManagement>
 
-	<dependencies>
-		<!--Needed to discover the 'xml-based' XmlExtensionLoader -->
-		<dependency>
-			<groupId>org.mule.runtime</groupId>
-			<artifactId>mule-module-extensions-xml-support</artifactId>
-			<version>${mule.version}</version>
-			<scope>provided</scope>
-		</dependency>
-		<!-- EE Dependency: Required for DataWeave -->
-		<dependency>
-			<groupId>com.mulesoft.mule.runtime.modules</groupId>
-			<artifactId>mule-module-spring-config-ee</artifactId>
-			<version>${mule.version}</version>
-			<scope>provided</scope>
-		</dependency>		
-	</dependencies>
+    <dependencies>
+        <!-- Needed to discover the 'xml-based' XmlExtensionLoader for smart connectors-->
+        <dependency>
+            <groupId>org.mule.runtime</groupId>
+            <artifactId>mule-module-extensions-xml-support</artifactId>
+            <version>${mule.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- EE Dependency: Required for DataWeave -->
+        <dependency>
+            <groupId>com.mulesoft.mule.runtime.modules</groupId>
+            <artifactId>mule-module-spring-config-ee</artifactId>
+            <version>${mule.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
 
-	<build>
-		<plugins>
-			<plugin>
-				<!-- Build plugin for XML SDK extension -->
-				<groupId>org.mule.runtime.plugins</groupId>
-				<artifactId>mule-extensions-maven-plugin</artifactId>
-				<version>${mule.extensions.maven.plugin.version}</version>
-				<extensions>true</extensions>
-			</plugin>
-			
-			<!-- MUnit: Definition is required even if MUnit is not used -->
+    <build>
+        <plugins>
+            <plugin>
+                <!-- Build plugin for XML SDK extension -->
+                <groupId>org.mule.runtime.plugins</groupId>
+                <artifactId>mule-extensions-maven-plugin</artifactId>
+                <version>${mule.extensions.maven.plugin.version}</version>
+                <extensions>true</extensions>
+            </plugin>
+            <!-- MUnit: Definition is required even if MUnit is not used -->
             <plugin>
                 <groupId>com.mulesoft.munit</groupId>
                 <artifactId>munit-extensions-maven-plugin</artifactId>
-				<dependencies>
-					<dependency>
-						<!-- Ensure using correct version for runtime.  This plugin may not have latest in its POM. -->
-						<groupId> org.mule.runtime</groupId>
-						<artifactId>mule-core</artifactId>
-						<version>${mule.version}</version>
-					</dependency>
-				</dependencies>
+                <dependencies>
+                    <dependency>
+                        <!-- Ensure using correct version for runtime.  This plugin may not have latest in its POM. -->
+                        <groupId> org.mule.runtime</groupId>
+                        <artifactId>mule-core</artifactId>
+                        <version>${mule.version}</version>
+                    </dependency>
+                </dependencies>
             </plugin>
-		</plugins>
-	</build>
+        </plugins>
+    </build>
 
-	<repositories>
-		<repository>
-			<id>mulesoft-releases</id>
-			<name>MuleSoft Releases Repository</name>
-			<url>https://repository.mulesoft.org/releases/</url>
-			<layout>default</layout>
-		</repository>
-		<repository>
-			<id>anypoint-exchange-v3</id>
-			<name>Anypoint Exchange V3</name>
-			<url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
-			<layout>default</layout>
-		</repository>
-	</repositories>
+    <repositories>
+        <repository>
+            <id>mulesoft-releases</id>
+            <name>MuleSoft Releases Repository</name>
+            <url>https://repository.mulesoft.org/releases/</url>
+            <layout>default</layout>
+        </repository>
+        <repository>
+            <id>anypoint-exchange-v3</id>
+            <name>Anypoint Exchange v3</name>
+            <url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
+            <layout>default</layout>
+        </repository>
+    </repositories>
 
 </project>
