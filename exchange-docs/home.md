@@ -2,7 +2,7 @@
 
 ℹ️ Source Code: [mulesoft-catalyst/error-handler-plugin](https://github.com/mulesoft-catalyst/error-handler-plugin)
 
-Table of Contents:
+<div id="toc" />Table of Contents #TOC:
 
 - [MuleSoft - Plugin - Error Handler Plugin](#mulesoft---plugin---error-handler-plugin)
   - [API Error Handler Overview](#api-error-handler-overview)
@@ -69,6 +69,8 @@ A JSON body response example is shown below. Note that the top-level field name,
 }
 ```
 
+[⬆️#TOC](#toc)
+
 ## Features
 
 This module provides all the features below.  It provides the main features of previous versions, while providing the developer the ability to completely customize their error messages.
@@ -93,10 +95,14 @@ The error messages that are used by this module are described below.  The module
 - **Previous Error Message**: the error message pulled from the error object's response payload (e.g. called API's error response).  If found, this is returned as the error message.  This can be completely customized but defaults to the error response payload produced by this module.
 - **Error Object Description**: the error message in the error object's description.  This is used for the Error Message in Common Errors or Custom Errors by default.  However, those can be customized to use something else instead.
 
+[⬆️#TOC](#toc)
+
 ## Compatibility
 
 - **The XML component namespace changed due to internal requirements so previous versions of this should be deleted from an app before using this version.**
 - **The API response format has breaking changes.**  While the response format has changed from versions previous to `6.0.0`, which breaks the API contract, you can create the same response format by transforming this module's response to the old format, if that is desired.
+
+[⬆️#TOC](#toc)
 
 ## Versions
 
@@ -127,6 +133,8 @@ This module may run on a runtime previous to the minimum listed, but it has not 
   - success
 - The Use Previous Error feature now replaces the error message instead of added to an array of error messages that includes the current error.
 - The error, previously errorDetails, is now a single object and not an array.  The message is a string but can be customized to an array or object.
+
+[⬆️#TOC](#toc)
 
 ## Operations
 
@@ -238,6 +246,8 @@ An example of the full error handler flow is shown below.  This example uses the
 </error-handler>
 ```
 
+[⬆️#TOC](#toc)
+
 ## Common Errors Tab
 
 - **Customize APIKit & HTTP Error Messages**
@@ -257,6 +267,8 @@ You can set the error message to the generated error description from the error 
 ![Use Generated Error](generatedError.png "Use Generated Error")
 
 **Note:** The only exception to using generated errors is the *dataweave Expression Error*, which does not use the generated error description, regardless of the setting since this can be a security risk.  If you want to add the generated error to this error, you will have to explicitly do that in its message field.
+
+[⬆️#TOC](#toc)
 
 ## Custom Errors Tab
 
@@ -384,6 +396,8 @@ There are some common functions provided by the module that you can use in your 
 - `getErrorTypeAsString`: Gets the string for the current Mule error type.  This corresponds to the *keys* in the custom error object.  Example: `HTTP:INTERNAL_SERVER_ERROR`.
 - `toString`: Converts any type to a string.  If not a string, it uses write() with Java format.  If empty, then returns empty string or the value specified in the second parameter.
 
+[⬆️#TOC](#toc)
+
 ## Advanced Tab
 
 ### General Configuration
@@ -445,6 +459,8 @@ This field allows you to customize the JSON key name where the error payload is 
   "message": "Error validating response"
 }
 ```
+
+[⬆️#TOC](#toc)
 
 ## Error Handling Tips
 
@@ -524,6 +540,8 @@ var errorType = getErrorTypeAsString(error.errorType)
 }
 ```
 
+[⬆️#TOC](#toc)
+
 ## Building
 
 When building this module, the required dependencies are provided by the standard MuleSoft maven repositories. Standard maven build commands work without any additional parameters required.  This is a [Mule XML SDK][xml-sdk] module.  Use `build.sh` as described under **Deploying** below to build the module.
@@ -553,6 +571,8 @@ It takes the parameters below.
 ```bash
 ./build.sh deploy 43ae201-c97b-4665-9310-e3ac89ce1c28
 ```
+
+[⬆️#TOC](#toc)
 
 [mule-ee]: https://docs.mulesoft.com/mule-runtime/latest/maven-reference#configure-mulesoft-enterprise-repository
 [mule-error]: https://docs.mulesoft.com/mule-runtime/4.4/mule-error-concept
