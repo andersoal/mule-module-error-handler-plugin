@@ -18,10 +18,26 @@ fun getErrorTypeAsString(errorType) =
  * Get the proper error from the merged default and custom error lists.  Provide a standard error if none found.
  */
 fun getError(errorType, defaultErrors, customErrors = {}) = do {
-  import mergeWith from dw::core::Objects
+    import mergeWith from dw::core::Objects
+
+    var errorTypeAnyNamespace  = ( do { var n = ((errorType splitBy  ":")[0] default "") --- if (!isBlank(n)) n ++ ":*" else errorType } )
+    var errorTypeAnyIdentifier = ( do { var i = ((errorType splitBy  ":")[1] default "") --- if (!isBlank(i)) "*:" ++ i else errorType } )
+
     var errorList = (defaultErrors mergeWith (customErrors default {}))
-    var foundError = errorList[errorType]
-    var error = if ( !isEmpty(foundError) ) foundError else errorList["UNKNOWN"]
+
+    // e.g. HTTP:CONNECTIVITY
+    var foundError         = errorList[errorType]
+    // e.g. *:CONNECTIVITY
+    var foundAnyIdentifier = if( isEmpty(foundError) and isEmpty(foundAnyNamespace) ) errorList[errorTypeAnyIdentifier] else {}
+    // e.g. HTTP:*
+    var foundAnyNamespace  = if( isEmpty(foundError)                                ) errorList[errorTypeAnyNamespace]  else {}
+
+    var error = (
+         if ( !isEmpty(foundError        ) ) foundError
+    else if ( !isEmpty(foundAnyIdentifier) ) foundAnyIdentifier
+    else if ( !isEmpty(foundAnyNamespace ) ) foundAnyNamespace
+    else                                     errorList["UNKNOWN"]
+    )
     ---
     error
 }
@@ -43,6 +59,6 @@ fun toString(value, def="") = do {
         case "String" -> safeValue
         case "Number" -> safeValue as String
         case "Binary" -> read(safeValue, "text/plain")
-        else -> write(safeValue, "application/java")
+        else          -> write(safeValue, "application/java")
     }
 }

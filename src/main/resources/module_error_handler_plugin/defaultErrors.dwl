@@ -14,8 +14,8 @@ fun getMessage(message) =
     code: 500,
     reason: "Internal Server Error",
     message: getMessage(vars.serverError)
-    },
-    // List of all standard API-related errors.
+  },
+  // List of all standard API-related errors.
   "APIKIT:BAD_REQUEST": {
     "code": 400,
     "reason": "Bad Request",
@@ -87,9 +87,9 @@ fun getMessage(message) =
     "message": getMessage(vars.notAcceptableError)
   },
   "HTTP:TIMEOUT": {
-      "code":408,
-      "reason": "Request Timeout",
-      "message": getMessage(vars.timeoutError)
+    "code":408,
+    "reason": "Request Timeout",
+    "message": getMessage(vars.timeoutError)
   },
   "APIKIT:UNSUPPORTED_MEDIA_TYPE": {
     "code": 415,
@@ -102,15 +102,15 @@ fun getMessage(message) =
     "message": getMessage(vars.unsupportedMediaTypeError)
   },
   "HTTP:TOO_MANY_REQUESTS": {
-      "code":429,
-      "reason": "Too Many Requests",
-      "message": getMessage(vars.tooManyRequestsError)
+    "code":429,
+    "reason": "Too Many Requests",
+    "message": getMessage(vars.tooManyRequestsError)
   },
   "MULE:EXPRESSION": {
-      "code":500,
-      "reason": "Internal Server Error",
+    "code":500,
+    "reason": "Internal Server Error",
     // Don't provide default error description for expression errors as that is a potential security issue.
-      "message":vars.expressionError default ""
+    "message":vars.expressionError default ""
   },
   "APIKIT:NOT_IMPLEMENTED": {
     "code": 501,
