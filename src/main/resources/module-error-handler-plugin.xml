@@ -2,7 +2,7 @@
 <module
     name="Error Handler Plugin"
     category="SELECT"
-    preffix="module-error-handler-plugin"
+    prefix="module-error-handler-plugin"
     doc:description="This module provides common error handling for APIs"
 
     xmlns="http://www.mulesoft.org/schema/mule/module"
@@ -268,7 +268,7 @@
         </body>
         <output type="OutputResponseType"></output>
         <output-attributes type="OutputAttributesType"></output-attributes>
-        
+
     </operation>
 
 </module>

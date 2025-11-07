@@ -2,9 +2,10 @@
 
 ℹ️ Source Code: [mulesoft-catalyst/error-handler-plugin](https://github.com/mulesoft-catalyst/error-handler-plugin)
 
-<div id="toc" />Table of Contents #TOC:
+## Table of Contents
 
 - [MuleSoft - Plugin - Error Handler Plugin](#mulesoft---plugin---error-handler-plugin)
+          - [Table of Contents](#table-of-contents)
   - [API Error Handler Overview](#api-error-handler-overview)
   - [Features](#features)
     - [Error Messages Used by Module](#error-messages-used-by-module)
@@ -44,20 +45,22 @@
 
 This error handler module processes any errors thrown in a flow and transforms to the correct JSON response body and HTTP status code for an API.
 
-ℹ️ *This requires the [MuleSoft Enterprise Maven Repository][mule-ee] to compile and use.*
+ℹ️ _This requires the _[_MuleSoft Enterprise Maven Repository_](https://docs.mulesoft.com/mule-runtime/latest/maven-reference#configure-mulesoft-enterprise-repository)_ to compile and use._
 
-All APIKit and HTTP exceptions are handled by the module and can be customized in the *Common Errors* tab.  Additional error definitions can be added via dataweave in the *Custom Errors* tab.
+All APIKit and HTTP exceptions are handled by the module and can be customized in the _Common Errors_ tab.  Additional error definitions can be added via DataWeave in the _Custom Errors_ tab.
 
 The error is converted by this module into the items below.
 
-- **HTTP status code**: *Status code* from the [HTTP RFC 7231 Response Status Codes][http-rfc-7231-6] for [Client Error 4xx][http-rfc-7231-6.5] and [Server Error 5xx][http-rfc-7231-6.6].
+- **HTTP status code**: _Status code_ from the [HTTP RFC 7231 Response Status Codes](https://tools.ietf.org/html/rfc7231#section-6) for [Client Error 4xx](https://tools.ietf.org/html/rfc7231#section-6.5) and [Server Error 5xx](https://tools.ietf.org/html/rfc7231#section-6.6).
 - **JSON response body**
-  - **Error status**:  *Status code*; see above.
-  - **Error reason**:  *Reason phrase* from the [HTTP RFC 7231 Response Status Codes][http-rfc-7231-6] for [Client Error 4xx][http-rfc-7231-6.5] and [Server Error 5xx][http-rfc-7231-6.6].
-  - **Error message**: This can be any text description, array, or object.  It is usually the Mule `error.description` or developer-defined dataweave or text.
+  - **Error status**:  _Status code_; see above.
+  - **Error reason**:  _Reason phrase_ from the [HTTP RFC 7231 Response Status Codes](https://tools.ietf.org/html/rfc7231#section-6) for [Client Error 4xx](https://tools.ietf.org/html/rfc7231#section-6.5) and [Server Error 5xx](https://tools.ietf.org/html/rfc7231#section-6.6).
+  - **Error message**: This can be any text description, array, or object.  It is usually the Mule `error.description` or developer-defined DataWeave or text.
 
 A JSON body response example is shown below. Note that the top-level field name, `error`, is customizable.
-**StatusCode: 400**
+
+**StatusCode:
+400**
 
 ```json
 {
@@ -69,7 +72,7 @@ A JSON body response example is shown below. Note that the top-level field name,
 }
 ```
 
-[⬆️#TOC](#toc)
+[⬆️Table of Contents](#table-of-contents)
 
 ## Features
 
@@ -89,27 +92,27 @@ This module provides all the features below.  It provides the main features of p
 
 ### Error Messages Used by Module
 
-The error messages that are used by this module are described below.  The module allows for customizing which one you use for your response to the caller via dataweave.  The module aggregates them all together into a string for error logging.
+The error messages that are used by this module are described below.  The module allows for customizing which one you use for your response to the caller via DataWeave.  The module aggregates them all together into a string for error logging.
 
 - **Error Message**: the error message generated from the matching error in Common Errors or Custom Errors.  This defaults to the **Error Object Description**.  If no previous error is found, this is returned as the error message.
 - **Previous Error Message**: the error message pulled from the error object's response payload (e.g. called API's error response).  If found, this is returned as the error message.  This can be completely customized but defaults to the error response payload produced by this module.
 - **Error Object Description**: the error message in the error object's description.  This is used for the Error Message in Common Errors or Custom Errors by default.  However, those can be customized to use something else instead.
 
-[⬆️#TOC](#toc)
+[⬆️Table of Contents](#table-of-contents)
 
 ## Compatibility
 
 - **The XML component namespace changed due to internal requirements so previous versions of this should be deleted from an app before using this version.**
 - **The API response format has breaking changes.**  While the response format has changed from versions previous to `6.0.0`, which breaks the API contract, you can create the same response format by transforming this module's response to the old format, if that is desired.
 
-[⬆️#TOC](#toc)
+[⬆️Table of Contents](#table-of-contents)
 
 ## Versions
 
 The released versions are listed below. The latest version is in master branch, and we recommend using that version.  However, if you want to use a previous version, you can fork the repository and branch from the version tag listed below.  Previous versions are not maintained, and no issues or PRs to previous versions will be accepted.
 
-- **`Java 17`: requires minimum Mule version `4.6.0`**
-- **`Java 9/11`: requires minimum Mule version `4.4.0`**
+- `Java 17` : requires minimum Mule version `4.6.0`
+- `Java 9/11` : requires minimum Mule version `4.4.0`
 
 This module may run on a runtime previous to the minimum listed, but it has not been tested on that runtime.
 
@@ -134,7 +137,7 @@ This module may run on a runtime previous to the minimum listed, but it has not 
 - The Use Previous Error feature now replaces the error message instead of added to an array of error messages that includes the current error.
 - The error, previously errorDetails, is now a single object and not an array.  The message is a string but can be customized to an array or object.
 
-[⬆️#TOC](#toc)
+[⬆️Table of Contents](#table-of-contents)
 
 ## Operations
 
@@ -159,6 +162,7 @@ This section describes how to configure and use the error handler in an app.  Th
 You can find and install from Exchange in Studio.
 
 Alternatively, you can manually add the dependency below to an app's pom.xml to include the API Error Handler in the app's maven build.
+
 The groupId value must be the appropriate Anypoint Org Id where the module is deployed.
 
 ```xml
@@ -186,9 +190,6 @@ Add `vars.httpStatus` to the listener's `http:response` and `http:error-response
     <http:response
         statusCode="#[vars.httpStatus default 200]">
     </http:response>
-```
-
-```xml
     <http:error-response
         statusCode="#[vars.httpStatus default 500]">
         <http:body ><![CDATA[#[payload]]]></http:body>
@@ -197,12 +198,11 @@ Add `vars.httpStatus` to the listener's `http:response` and `http:error-response
 
 ### Error Handler Flow
 
-1. Drag the *Process Error* operation from Studio's palette into the error handler to transform errors into API response. Place the module inside an error block: `on-error-continue`.
+1. Drag the _Process Error_ operation from Studio's palette into the error handler to transform errors into API response. Place the module inside an error block: `on-error-continue`.
 2. Set vars.httpStatus = attributes.httpStatus
 3. Log error message: attributes.errorLog
 4. Reference this error handler in the APIkit's main flow to be the top-level error handler for the API.
-
-- **Module XML**
+5. **Module XML**
 
 ```xml
 <module-error-handler-plugin:process-error
@@ -246,44 +246,46 @@ An example of the full error handler flow is shown below.  This example uses the
 </error-handler>
 ```
 
-[⬆️#TOC](#toc)
+[⬆️Table of Contents](#table-of-contents)
 
 ## Common Errors Tab
 
 - **Customize APIKit & HTTP Error Messages**
 
-Modify the error message for the APIKit and HTTP errors on the *Common Errors* tab.  This field supports dataweave for dynamically generated messages if needed.
-The response status code and error reason (phrase) *cannot* be changed for common errors on this tab.
+Modify the error message for the APIKit and HTTP errors on the _Common Errors_ tab.  This field supports DataWeave for dynamically generated messages if needed.
 
-- Additional errors not covered here can be mapped to the same status codes with the *Custom Errors* feature.
-- If you want to change the status code or reason, use the *Custom Errors* feature to override the desired APIKit or HTTP exceptions.
+The response status code and error reason (phrase) _cannot_ be changed for common errors on this tab.
+
+- Additional errors not covered here can be mapped to the same status codes with the _Custom Errors_ feature.
+- If you want to change the status code or reason, use the _Custom Errors_ feature to override the desired APIKit or HTTP exceptions.
 
 ![Common Errors Tab](commonErrors.png "Common Errors Tab")
 
 ### Use Generated Error Message
 
-You can set the error message to the generated error description from the error object, `error.description`, based on the *Use Generated Error Description Instead* selection.  If it evaluates to true, the generated error will be used as the error message.  If it evaluates to false, the user-provided message will be used.  This selection only applies to common errors.  It does not apply to custom errors.  If you want to add dynamic error messages via dataweave, then set this to `false` and add the dataweave into the message fields.
+You can set the error message to the generated error description from the error object, `error.description`, based on the _Use Generated Error Description Instead_ selection.  If it evaluates to true, the generated error will be used as the error message.  If it evaluates to false, the user-provided message will be used.  This selection only applies to common errors.  It does not apply to custom errors.  If you want to add dynamic error messages via DataWeave, then set this to `false` and add the DataWeave into the message fields.
 
 ![Use Generated Error](generatedError.png "Use Generated Error")
 
-**Note:** The only exception to using generated errors is the *dataweave Expression Error*, which does not use the generated error description, regardless of the setting since this can be a security risk.  If you want to add the generated error to this error, you will have to explicitly do that in its message field.
+**Note:** The only exception to using generated errors is the _DataWeave Expression Error_, which does not use the generated error description, regardless of the setting since this can be a security risk.  If you want to add the generated error to this error, you will have to explicitly do that in its message field.
 
-[⬆️#TOC](#toc)
+[⬆️Table of Contents](#table-of-contents)
 
 ## Custom Errors Tab
 
 - **Customize Full Error Definitions**
 
-You can add any number of custom error definitions for the module to include in the mapping.  This is done by defining these custom error mappings inline or in a [dataweave file][dataweave-file].  The screenshot shows using a file.
+You can add any number of custom error definitions for the module to include in the mapping.  This is done by defining these custom error mappings inline or in a [DataWeave file](https://docs.mulesoft.com/DataWeave/2.4/DataWeave-language-introduction#dwl_file).  The screenshot shows using a file.
 
 ![Custom Errors Tab](customErrors.png "Custom Errors Tab")
 
 ### Using a File
 
-A file is recommended.  This file should be in or below `src/main/resources` folder in the Mule app.  Recommended practice is to put it in an *errors* folder: `src/main/resources/errors`.
+A file is recommended.  This file should be in or below `src/main/resources` folder in the Mule app.  Recommended practice is to put it in an _errors_ folder: `src/main/resources/errors`.
 
-When adding the file name to the *Custom Errors* field in the module, make sure to include the full relative path from the resources folder.
-Example: if the custom errors file is `src/main/resources/errors/customErrors.dwl` then this field should be `errors/customErrors.dwl`.  The full syntax for importing a dataweave file and processing it is listed below.
+When adding the file name to the _Custom Errors_ field in the module, make sure to include the full relative path from the resources folder.
+
+Example: if the custom errors file is `src/main/resources/errors/customErrors.dwl` then this field should be `errors/customErrors.dwl`.  The full syntax for importing a DataWeave file and processing it is listed below.
 
 ```xml
 ${file::errors/customErrors.dwl}
@@ -291,9 +293,9 @@ ${file::errors/customErrors.dwl}
 
 ### Error Format
 
-The custom errors must be an *object of objects* with the fields below.
+The custom errors must be an _object of objects_ with the fields below.
 
-- Key: [Mule error type][mule-error-types] used to match.  Example: `HTTP:BAD_REQUEST`
+- Key: [Mule error type](https://docs.mulesoft.com/mule-runtime/4.4/mule-error-concept#error_types) used to match.  Example: `HTTP:BAD_REQUEST`
 - Value: (object)
   - `code`: HTTP status code to send in response.  This is a number.
   - `reason`: Error reason phrase to send in JSON body response.  This is a string.
@@ -309,7 +311,7 @@ A template custom error file, [examples/customErrors.dwl](./examples/customError
 - Common error override: `HTTP:INTERNAL_SERVER_ERROR`.  This is recommended when not using previous error for all errors, since it uses previous error for all 500 responses.  This can also be done in the Common Errors tab.
 - Unknown error handler: `MULE:UNKNOWN`.  This is recommended when you want to propagate message and error code from non-standard errors, like `495`.
 
-```js,dw,dataweave
+```js,dw,DataWeave
 /**
  * This provides custom error handling for the API Error Handler.
  */
@@ -393,22 +395,22 @@ var previousError = do {
 
 There are some common functions provided by the module that you can use in your custom errors definition.  They are imported by `import * from module_error_handler_plugin::common`.
 
-- `getErrorTypeAsString`: Gets the string for the current Mule error type.  This corresponds to the *keys* in the custom error object.  Example: `HTTP:INTERNAL_SERVER_ERROR`.
+- `getErrorTypeAsString`: Gets the string for the current Mule error type.  This corresponds to the _keys_ in the custom error object.  Example: `HTTP:INTERNAL_SERVER_ERROR`.
 - `toString`: Converts any type to a string.  If not a string, it uses write() with Java format.  If empty, then returns empty string or the value specified in the second parameter.
 
-[⬆️#TOC](#toc)
+[⬆️Table of Contents](#table-of-contents)
 
 ## Advanced Tab
 
 ### General Configuration
 
-General configuration is defined on the *Advanced* tab.  This includes the *Error Object* definition and *Use Previous Error* feature.
+General configuration is defined on the _Advanced_ tab.  This includes the _Error Object_ definition and _Use Previous Error_ feature.
 
 ![Advanced Tab](advanced.png "Advanced Tab")
 
 ### Error Object
 
-The error object definition takes the standard [Mule Error][mule-error] by default, which is the recommended setting.  You can change this as long as the provided object has the same fields as the [Mule Error][mule-error].
+The error object definition takes the standard [Mule Error](https://docs.mulesoft.com/mule-runtime/4.4/mule-error-concept) by default, which is the recommended setting.  You can change this as long as the provided object has the same fields as the [Mule Error](https://docs.mulesoft.com/mule-runtime/4.4/mule-error-concept).
 
 ### Use Previous Error
 
@@ -416,7 +418,7 @@ Connectors usually generate error responses their own error responses and wrap t
 
 A common scenario is when a system API generates an error that needs to get propagated back to the caller of the experience or process API.  Using normal error handling, like `error.description`, the SOAP fault or `500` response from the called system is not logged or propagated.  These items are nested in the error object here: `error.exception.errorMessage.typedValue.payload` and `error.exception.errorMessage.typedValue.attributes`.  Be aware that payload and attributes won't be accessable by selector if the content is `Binary`.  If the type is `Binary`, then you must read the error payload, `error.exception.errorMessage.typedValue`, as the correct MIME type if you want to access a specific field using a selector.
 
-This feature will automatically replace the `message` field for ***all errors*** with the previous error defined by the provided dataweave if one exists.  If the previous error does not exist or is empty, then it will leave the `message` field with its current value.  This feature does not append the previous error to the current one.  It simply replaces and is best used to propagate downstream errors up the API stack.
+This feature will automatically replace the `message` field for _**all errors**_ with the previous error defined by the provided DataWeave if one exists.  If the previous error does not exist or is empty, then it will leave the `message` field with its current value.  This feature does not append the previous error to the current one.  It simply replaces and is best used to propagate downstream errors up the API stack.
 
 The DataWeave should resolve to a string but any type is allowed. You can override in any manner; the template custom error file gives a comprehensive example on how to convert nested errors to strings.
 
@@ -460,15 +462,15 @@ This field allows you to customize the JSON key name where the error payload is 
 }
 ```
 
-[⬆️#TOC](#toc)
+[⬆️Table of Contents](#table-of-contents)
 
 ## Error Handling Tips
 
 ### Override the Default Error
 
-If you want to override the default error when no errors matched (500 - Internal Server Error), use the error type `UNKNOWN` in the custom errors definition.  This allows updating  **unmapped** errors, which is the default error.  If you only want to change the message, update it in the *Common Errors* tab, instead of in *Custom Errors*.
+If you want to override the default error when no errors matched (500 - Internal Server Error), use the error type `UNKNOWN` in the custom errors definition.  This allows updating  **unmapped** errors, which is the default error.  If you only want to change the message, update it in the _Common Errors_ tab, instead of in _Custom Errors_.
 
-```js,dw,dataweave
+```js,dw,DataWeave
     "UNKNOWN": {
         "code":528,
         "reason": "API Error",
@@ -478,11 +480,11 @@ If you want to override the default error when no errors matched (500 - Internal
 
 ### Override Non-Standard HTTP Status Code Errors
 
-If you want to override the error when no errors matched (500 - Internal Server Error) for **non-standard HTTP status code responses**, like `455`, use the error type `MULE:UNKNOWN` in the custom errors definition.  This allows updating  **unknown** errors, which correspond to non-standard HTTP status codes when coming from HTTP requester.  If you don't want to distinguish between *unmapped* errors (`UNKNOWN`) and *unknown* errors (`MULE:UNKNOWN`), then use the `UNKNOWN` type.
+If you want to override the error when no errors matched (500 - Internal Server Error) for **non-standard HTTP status code responses**, like `455`, use the error type `MULE:UNKNOWN` in the custom errors definition.  This allows updating  **unknown** errors, which correspond to non-standard HTTP status codes when coming from HTTP requester.  If you don't want to distinguish between _unmapped_ errors (`UNKNOWN`) and _unknown_ errors (`MULE:UNKNOWN`), then use the `UNKNOWN` type.
 
 This propagates the HTTP status code, reasonPhrase, and message from the external system's error response.
 
-```js,dw,dataweave
+```js,dw,DataWeave
     "MULE:UNKNOWN": {
         code: error.exception.errorMessage.attributes.statusCode default 500,
         reason: error.exception.errorMessage.attributes.reasonPhrase default "Internal Server Error",
@@ -492,23 +494,20 @@ This propagates the HTTP status code, reasonPhrase, and message from the externa
 
 ### Downstream API Errors
 
-As described in the *Use Previous Error* feature in the *Advanced* tab, sometimes it is useful to get the downstream error when it is generated from a connector.  That feature forces the downstream error propagation for all errors.
+As described in the _Use Previous Error_ feature in the _Advanced_ tab, sometimes it is useful to get the downstream error when it is generated from a connector.  That feature forces the downstream error propagation for all errors.
 
 Sometimes, you only want to propagate certain errors and not all.  It is best practice to propagate `500` error message from Mule APIs up the API network.  However, you may not want to propagate the error if it was a connection or authentication issue, which may provide info that you don't want going back to the caller.
 
-If you want to only propagate specific errors, then leave the *Use Previous Error* field empty and only put the previous error messages in specific common or custom errors.
+If you want to only propagate specific errors, then leave the _Use Previous Error_ field empty and only put the previous error messages in specific common or custom errors.
 
-Accessing a previous error message from a downstream API that uses the API Handler Module or conforms to its response format can be done using the `getPreviousErrorMessage` common function.  Since this requires an import statement, it's most useful in the custom errors definition.  The common error message fields are best set using the specific nested error directly: `error.exception.errorMessage.payload.error.message default ""` 
+Accessing a previous error message from a downstream API that uses the API Handler Module or conforms to its response format can be done using the `getPreviousErrorMessage` common function.  Since this requires an import statement, it's most useful in the custom errors definition.  The common error message fields are best set using the specific nested error directly: `error.exception.errorMessage.payload.error.message default ""`
 
 The example DataWeave snippet below shows how to access a called Mule API's error message for propagating, assuming that those message are in `error.message` in the response body.  It falls back to the standard error description if the previous error is not available.
 
-```js,dw,dataweave
+```js,dw,DataWeave
 import * from module_error_handler_plugin::common
 var previousError = getPreviousErrorMessage(error)
 ---
-```
-
-```js,dw,dataweave
   message: if (!isEmpty(previousError)) previousError else error.description
 ```
 
@@ -516,7 +515,7 @@ var previousError = getPreviousErrorMessage(error)
 
 The `message` field in the response body can be of any type.  A string is recommended, but this can also be an array of errors if needed to show history of errors across APIs.  To create an array of errors, follow the steps below.
 
-- Create the list of errors with DataWeave in the `message` field contained in the *Custom Error* definition.  This can be done in the message fields in the *Common Error* tab for the common errors.
+- Create the list of errors with DataWeave in the `message` field contained in the _Custom Error_ definition.  This can be done in the message fields in the _Common Error_ tab for the common errors.
 - Log the error in your flow while handling the array so it logs appropriately.
 
 You can also simply set the `message` to a single string containing the merged array of errors.
@@ -525,9 +524,9 @@ You can also simply set the `message` to a single string containing the merged a
 
 If you have a special, non-standard, use-case where you need to force all of the API's errors to 500 with the same error message then you can use a single custom error to override all errors.
 
-Do this by dynamically setting the error type key with the `getErrorTypeAsString` function.  This will always match the current error.  This is should be avoided unless you have a requirement to do this. 
+Do this by dynamically setting the error type key with the `getErrorTypeAsString` function.  This will always match the current error.  This is should be avoided unless you have a requirement to do this.
 
-```js,dw,dataweave
+```js,dw,DataWeave
 import * from module_error_handler_plugin::common
 var errorType = getErrorTypeAsString(error.errorType)
 ---
@@ -540,11 +539,11 @@ var errorType = getErrorTypeAsString(error.errorType)
 }
 ```
 
-[⬆️#TOC](#toc)
+[⬆️Table of Contents](#table-of-contents)
 
 ## Building
 
-When building this module, the required dependencies are provided by the standard MuleSoft maven repositories. Standard maven build commands work without any additional parameters required.  This is a [Mule XML SDK][xml-sdk] module.  Use `build.sh` as described under **Deploying** below to build the module.
+When building this module, the required dependencies are provided by the standard MuleSoft maven repositories. Standard maven build commands work without any additional parameters required.  This is a [Mule XML SDK](https://docs.mulesoft.com/mule-sdk/1.1/xml-sdk) module.  Use `build.sh` as described under **Deploying** below to build the module.
 
 ## Deploying
 
@@ -553,14 +552,15 @@ The `build.sh` script executes maven commands on the module, including deploying
 It takes the parameters below.
 
 1. Build option:  the type of build to execute: [package, install, deploy].
-  - package: builds the package without installing
-  - install: builds locally (installs dependencies and module in local maven repository)
-  - deploy: deploys module to Exchange
+
+    - package: builds the package without installing
+    - install: builds locally (installs dependencies and module in local maven repository)
+    - deploy: deploys module to Exchange
+
 2. Maven Group Id: the Maven group id for the artifact. Can be Anypoint business organization to which to deploy the module.
 3. Repo ID: the ID of the Maven repository. Defaults to Exchange2 if not provided.
 4. Repo URL: the URL of the Maven repository. Defaults to Anypoint Exchange URL if not provided.
-
-- **Syntax**
+5. **Syntax**
 
 ```bash
 ./build.sh [build option] [Maven Group ID] [repo ID] [repo URL]
@@ -572,13 +572,4 @@ It takes the parameters below.
 ./build.sh deploy 43ae201-c97b-4665-9310-e3ac89ce1c28
 ```
 
-[⬆️#TOC](#toc)
-
-[mule-ee]: https://docs.mulesoft.com/mule-runtime/latest/maven-reference#configure-mulesoft-enterprise-repository
-[mule-error]: https://docs.mulesoft.com/mule-runtime/4.4/mule-error-concept
-[mule-error-types]: https://docs.mulesoft.com/mule-runtime/4.4/mule-error-concept#error_types
-[http-rfc-7231-6]: https://tools.ietf.org/html/rfc7231#section-6
-[http-rfc-7231-6.5]: https://tools.ietf.org/html/rfc7231#section-6.5
-[http-rfc-7231-6.6]: https://tools.ietf.org/html/rfc7231#section-6.6
-[dataweave-file]: https://docs.mulesoft.com/dataweave/2.4/dataweave-language-introduction#dwl_file
-[xml-sdk]: https://docs.mulesoft.com/mule-sdk/1.1/xml-sdk
+[⬆️Table of Contents](#table-of-contents)
