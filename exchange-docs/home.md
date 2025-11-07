@@ -5,7 +5,7 @@
 ## Table of Contents
 
 - [MuleSoft - Plugin - Error Handler Plugin](#mulesoft---plugin---error-handler-plugin)
-          - [Table of Contents](#table-of-contents)
+  - [Table of Contents](#table-of-contents)
   - [API Error Handler Overview](#api-error-handler-overview)
   - [Features](#features)
     - [Error Messages Used by Module](#error-messages-used-by-module)
@@ -560,7 +560,7 @@ It takes the parameters below.
 
 2. **Required** Maven Group Id: the Maven group id for the artifact. Can be Anypoint business organization to which to deploy the module.
 3. Repo ID: the ID of the Maven repository. Defaults to `anypoint-exchange-v2` if not provided.
-4. Repo URL: the URL of the Maven repository. Defaults to Anypoint Exchange URL if not provided.
+4. Repo URL: the URL of the Maven repository. Defaults to Anypoint Exchange URL `https://maven.anypoint.mulesoft.com/api/v2/organizations/${project.groupId}/maven` if not provided.
 
 ### Syntax of Command
 
@@ -575,9 +575,10 @@ It takes the parameters below.
 ```
 You can also execute the commands of maven instead of using the `build.sh` script.
 
-1. Change the `groupId` to the main Business Group Id of Anypoint Platform
+1. Change the `groupId` on `pom.xml` to the main Business Group Id of Anypoint Platform
 2. `mvn clean package` to validate the build of the plugin.
 3. `mvn clean deploy` to deploy the plugin.
+
 ⚠️ Some issues may happen, try to review the version of JDK or maven. It also can be `.m2/settings.xml`.
 
 

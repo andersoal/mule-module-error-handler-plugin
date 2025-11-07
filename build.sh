@@ -33,7 +33,7 @@ function execute {
 # Run provided maven command on the specified project
 # $1: Maven phase [package, install, deploy]
 function buildProject {
-	
+
 	# Generate POM
 	execute "sed 's/ORG_ID_TOKEN/${GROUP_ID}/g' pom.xml > pom-generated.xml"
 
@@ -48,16 +48,16 @@ function buildProject {
 
     # Execute maven command
     execute "$MAVEN_CMD"
-	
+
 	if [ $? != 0 ]
 	then
 	  printf "[ERROR] Failed %s %s\n" "$1"
 	  exit 1
 	fi
-	
+
 	# Delete generated POM
 	execute "rm -f pom-generated.xml"
-	
+
 	printf "\nCompleted %s %s\n\n" "$1"
 }
 
