@@ -103,9 +103,10 @@
             <id>mulesoft-releases</id>
             <name>MuleSoft Releases Repository</name>
             <url>https://repository.mulesoft.org/releases/</url>
+            <layout>default</layout>
             <snapshots>
-            <enabled>false</enabled>
-        </snapshots>
+                <enabled>false</enabled>
+            </snapshots>
         </pluginRepository>
     </pluginRepositories>
 
