@@ -224,7 +224,7 @@ Add `vars.httpStatus` to the listener's `http:response` and `http:error-response
 
 An example of the full error handler flow is shown below.  This example uses the built-in logger for logging the error.
 
-![Error Handler Flow](handlerFlow.png "Error Handler Flow")
+![Error Handler Flow](./assets/handlerFlow.png "Error Handler Flow")
 
 ```xml
 <error-handler name="api-error-handler">
@@ -259,13 +259,13 @@ The response status code and error reason (phrase) _cannot_ be changed for commo
 - Additional errors not covered here can be mapped to the same status codes with the _Custom Errors_ feature.
 - If you want to change the status code or reason, use the _Custom Errors_ feature to override the desired APIKit or HTTP exceptions.
 
-![Common Errors Tab](commonErrors.png "Common Errors Tab")
+![Common Errors Tab](./assets/commonErrors.png "Common Errors Tab")
 
 ### Use Generated Error Message
 
 You can set the error message to the generated error description from the error object, `error.description`, based on the _Use Generated Error Description Instead_ selection.  If it evaluates to true, the generated error will be used as the error message.  If it evaluates to false, the user-provided message will be used.  This selection only applies to common errors.  It does not apply to custom errors.  If you want to add dynamic error messages via DataWeave, then set this to `false` and add the DataWeave into the message fields.
 
-![Use Generated Error](generatedError.png "Use Generated Error")
+![Use Generated Error](./assets/generatedError.png "Use Generated Error")
 
 **Note:** The only exception to using generated errors is the _DataWeave Expression Error_, which does not use the generated error description, regardless of the setting since this can be a security risk.  If you want to add the generated error to this error, you will have to explicitly do that in its message field.
 
@@ -277,7 +277,7 @@ You can set the error message to the generated error description from the error 
 
 You can add any number of custom error definitions for the module to include in the mapping.  This is done by defining these custom error mappings inline or in a [DataWeave file](https://docs.mulesoft.com/DataWeave/2.4/DataWeave-language-introduction#dwl_file).  The screenshot shows using a file.
 
-![Custom Errors Tab](customErrors.png "Custom Errors Tab")
+![Custom Errors Tab](./assets/customErrors.png "Custom Errors Tab")
 
 ### Using a File
 
@@ -406,7 +406,7 @@ There are some common functions provided by the module that you can use in your 
 
 General configuration is defined on the _Advanced_ tab.  This includes the _Error Object_ definition and _Use Previous Error_ feature.
 
-![Advanced Tab](advanced.png "Advanced Tab")
+![Advanced Tab](./assets/advanced.png "Advanced Tab")
 
 ### Error Object
 
@@ -416,7 +416,7 @@ The error object definition takes the standard [Mule Error](https://docs.mulesof
 
 Connectors usually generate error responses their own error responses and wrap the actual error response from the external system in the error object. This causes the external system's response to be lost and not propagated back to the API's caller.  The previous error feature allows the module to retrieve the external system's error response from the error object and use that as the error message.
 
-A common scenario is when a system API generates an error that needs to get propagated back to the caller of the experience or process API.  Using normal error handling, like `error.description`, the SOAP fault or `500` response from the called system is not logged or propagated.  These items are nested in the error object here: `error.exception.errorMessage.typedValue.payload` and `error.exception.errorMessage.typedValue.attributes`.  Be aware that payload and attributes won't be accessable by selector if the content is `Binary`.  If the type is `Binary`, then you must read the error payload, `error.exception.errorMessage.typedValue`, as the correct MIME type if you want to access a specific field using a selector.
+A common scenario is when a system API generates an error that needs to get propagated back to the caller of the experience or process API.  Using normal error handling, like `error.description`, the SOAP fault or `500` response from the called system is not logged or propagated.  These items are nested in the error object here: `error.exception.errorMessage.typedValue.payload` and `error.exception.errorMessage.typedValue.attributes`.  Be aware that payload and attributes won't be accessible by selector if the content is `Binary`.  If the type is `Binary`, then you must read the error payload, `error.exception.errorMessage.typedValue`, as the correct MIME type if you want to access a specific field using a selector.
 
 This feature will automatically replace the `message` field for _**all errors**_ with the previous error defined by the provided DataWeave if one exists.  If the previous error does not exist or is empty, then it will leave the `message` field with its current value.  This feature does not append the previous error to the current one.  It simply replaces and is best used to propagate downstream errors up the API stack.
 
@@ -547,20 +547,22 @@ When building this module, the required dependencies are provided by the standar
 
 ## Deploying
 
-The `build.sh` script executes maven commands on the module, including deploying to Exchange.  For deploying to Anypoint Exchange or other binary repositorities, server credentials must be in your maven `settings.xml` file, and repository and server properly linked in `pom.xml`.
+The `build.sh` script executes maven commands on the module, including deploying to Exchange.
+For deploying to Anypoint Exchange or other binary repositories, server credentials must be in your maven `settings.xml` file, and repository and server properly linked in `pom.xml`.
 
 It takes the parameters below.
 
-1. Build option:  the type of build to execute: [package, install, deploy].
+1. **Required** Build option: the type of build to execute: [package, install, deploy].
 
-    - package: builds the package without installing
-    - install: builds locally (installs dependencies and module in local maven repository)
-    - deploy: deploys module to Exchange
+    - `package`: builds the package without installing
+    - `install`: builds locally (installs dependencies and module in local maven repository)
+    - `deploy`: deploys module to Exchange
 
-2. Maven Group Id: the Maven group id for the artifact. Can be Anypoint business organization to which to deploy the module.
-3. Repo ID: the ID of the Maven repository. Defaults to Exchange2 if not provided.
+2. **Required** Maven Group Id: the Maven group id for the artifact. Can be Anypoint business organization to which to deploy the module.
+3. Repo ID: the ID of the Maven repository. Defaults to `anypoint-exchange-v2` if not provided.
 4. Repo URL: the URL of the Maven repository. Defaults to Anypoint Exchange URL if not provided.
-5. **Syntax**
+
+### Syntax of Command
 
 ```bash
 ./build.sh [build option] [Maven Group ID] [repo ID] [repo URL]
@@ -571,5 +573,12 @@ It takes the parameters below.
 ```bash
 ./build.sh deploy 43ae201-c97b-4665-9310-e3ac89ce1c28
 ```
+You can also execute the commands of maven instead of using the `build.sh` script.
+
+1. Change the `groupId` to the main Business Group Id of Anypoint Platform
+2. `mvn clean package` to validate the build of the plugin.
+3. `mvn clean deploy` to deploy the plugin.
+⚠️ Some issues may happen, try to review the version of JDK or maven. It also can be `.m2/settings.xml`.
+
 
 [⬆️Table of Contents](#table-of-contents)
