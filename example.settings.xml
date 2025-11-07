@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<settings>
+    <servers>
+        <server>
+            <id>MuleRepository</id>
+            <username>nexus_username</username>
+            <password>nexus_password</password>
+        </server>
+        <server>
+            <id>anypoint-exchange-v2</id>
+            <username>~~~Client~~~</username>
+            <!-- connected app: org-devops-exchange -->
+            <password>client_id~?~client_secret</password>
+        </server>
+        <server>
+            <id>anypoint-exchange-v3</id>
+            <username>~~~Client~~~</username>
+            <!-- connected app: org-devops-exchange -->
+            <password>client_id~?~client_secret</password>
+        </server>
+    </servers>
+    <profiles>
+        <profile>
+            <id>Mule</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <repositories>
+                <repository>
+                    <id>mulesoft-releases</id>
+                    <name>MuleSoft Releases</name>
+                    <!-- Contains open source libraries for the Community Edition, but only the release versions. -->
+                    <url>https://repository.mulesoft.org/releases/</url>
+                    <layout>default</layout>
+                </repository>
+                <!-- <repository> -->
+                <!--     <id>mulesoft-snapshots</id> -->
+                <!--     <name>MuleSoft Snapshots</name> -->
+                         <!-- Contains open source libraries for the Community Edition in their snapshot version. -->
+                <!--     <url>http://repository.mulesoft.org/snapshots/</url> -->
+                <!--     <layout>default</layout> -->
+                <!-- </repository> -->
+                <repository>
+                    <id>mule-extra</id>
+                    <name>MuleSoft Public Repository</name>
+                    <!-- It contains all the third-party libraries required by Mule. -->
+                    <!-- It's an optional repository as the libraries are already in other public Maven repositories. -->
+                    <url>https://repository.mulesoft.org/nexus/content/repositories/public</url>
+                    <releases>
+                        <enabled>true</enabled>
+                        <checksumPolicy>fail</checksumPolicy>
+                    </releases>
+                    <snapshots>
+                        <enabled>true</enabled>
+                        <checksumPolicy>warn</checksumPolicy>
+                    </snapshots>
+                </repository>
+                <repository>
+                    <id>MuleRepository</id>
+                    <name>Mule Enterprise Repository</name>
+                    <!-- This repository contains the Mule Enterprise Edition and its related libraries. -->
+                    <!-- It's necessary to create an application with Enterprise components, like DataWeave. -->
+                    <!-- To access this repository, it's required to use the customer Nexus credentials -->
+                    <!-- The MuleSoft Enterprise Repository requires credentials. Here the customer credentials provided by MuleSoft Support have to be configured. -->
+                    <url>https://repository.mulesoft.org/nexus-ee/content/repositories/releases-ee/</url>
+                    <layout>default</layout>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>true</enabled>
+                    </snapshots>
+                </repository>
+            </repositories>
+        </profile>
+    </profiles>
+</settings>
