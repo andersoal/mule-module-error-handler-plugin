@@ -1,0 +1,45 @@
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "description": "Enter Client ID of MuleSoft Anypoint Platform Connected App (Acts on Its Own Behalf)",
+      "id": "MULESOFT_APP_CLIENT_ID",
+      //"default": "${env:MULESOFT_APP_CLIENT_ID}"
+    },
+    {
+      "type": "promptString",
+      "description": "Enter Client Secret of MuleSoft Anypoint Platform Connected App (Acts on Its Own Behalf)",
+      "id": "MULESOFT_APP_CLIENT_SECRET",
+      "password": true,
+      //"default": "${env:MULESOFT_APP_CLIENT_SECRET}"
+    },
+    {
+      "type": "pickString",
+      "description": "Select the MuleSoft Anypoint Platform region",
+      "id": "MULESOFT_APP_REGION",
+      "default": "PROD_US",
+      "options": [
+        "PROD_US",
+        "PROD_EU",
+        "PROD_CA",
+        "PROD_JP"
+      ]
+    }
+  ],
+  "servers": {
+    "mulesoft": {
+      //https://www.npmjs.com/package/@mulesoft/mcp-server
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mulesoft/mcp-server",
+        "start"
+      ],
+      "env": {
+        "ANYPOINT_CLIENT_ID": "${input:MULESOFT_APP_CLIENT_ID}",
+        "ANYPOINT_CLIENT_SECRET": "${input:MULESOFT_APP_CLIENT_SECRET}",
+        "ANYPOINT_REGION": "${input:MULESOFT_APP_REGION}"
+      }
+    }
+  }
+}
