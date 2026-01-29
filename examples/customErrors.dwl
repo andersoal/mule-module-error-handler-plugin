@@ -1,7 +1,7 @@
 /**
  * This provides custom error handling for the API Error Handler.
  */
- 
+
 %dw 2.0
 output application/json
 import * from module_error_handler_plugin::common
@@ -61,7 +61,7 @@ var previousError = do {
         reason: "Internal Server Error",
         message: if (!isEmpty(previousError)) previousError else error.description
     },
-    
+
     /*
     Unknown Errors
     This catches unknown errors, which includes any non-standard HTTP error status code and propagates the detailed reason for failure.
