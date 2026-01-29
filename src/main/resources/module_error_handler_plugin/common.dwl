@@ -27,10 +27,10 @@ fun getError(errorType, defaultErrors, customErrors = {}) = do {
 
     // e.g. HTTP:CONNECTIVITY
     var foundError         = errorList[errorType]
-    // e.g. *:CONNECTIVITY
-    var foundAnyIdentifier = if( isEmpty(foundError) and isEmpty(foundAnyNamespace) ) errorList[errorTypeAnyIdentifier] else {}
     // e.g. HTTP:*
     var foundAnyNamespace  = if( isEmpty(foundError)                                ) errorList[errorTypeAnyNamespace]  else {}
+    // e.g. *:CONNECTIVITY
+    var foundAnyIdentifier = if( isEmpty(foundError) and isEmpty(foundAnyNamespace) ) errorList[errorTypeAnyIdentifier] else {}
 
     var error = (
          if ( !isEmpty(foundError        ) ) foundError
