@@ -11,10 +11,32 @@ fun getMessage(message) =
 {
   // Default error if no matching errors.
   "UNKNOWN": {
-    code: 500,
-    reason: "Internal Server Error",
+    code   : 500,
+    reason : "Internal Server Error",
     message: getMessage(vars.serverError)
   },
+  "MULE:EXPRESSION": {
+    "code": 500,
+    "reason": "Transformation Error",
+    // Don't provide default error description for expression errors as that is a potential security issue.
+    "message": vars.expressionError default ""
+  },
+  // Custom error
+  "VALIDATION:*": {
+    code        : 400,
+    reason      : "Bad Request",
+    message     : error.description,
+  },
+  "OS:KEY_NOT_FOUND": {
+    code   : 404,
+    reason : "Key Not Found",
+    message: "Some of the parameters was not found."
+  },
+  // Others HTTP:*
+  "HTTP:BASIC_AUTHENTICATION"  : { code: 401, reason: "Unauthorized"          , message: getMessage(vars.unauthorizedError) },
+  "HTTP:GATEWAY_TIMEOUT"       : { code: 504, reason: "Gateway Timeout"       , message: getMessage(vars.timeoutError)      },
+  "HTTP:SERVER_SECURITY"       : { code: 511, reason: "Server Security Issue" , message: getMessage(vars.connectivityError) },
+  "HTTP:TRANSFORMATION"        : { code: 500, reason: "Transformation Error"  , message: vars.expressionError default ""    },
   // List of all standard API-related errors.
   "APIKIT:BAD_REQUEST": {
     "code": 400,
@@ -87,7 +109,7 @@ fun getMessage(message) =
     "message": getMessage(vars.notAcceptableError)
   },
   "HTTP:TIMEOUT": {
-    "code":408,
+    "code": 408,
     "reason": "Request Timeout",
     "message": getMessage(vars.timeoutError)
   },
@@ -102,15 +124,9 @@ fun getMessage(message) =
     "message": getMessage(vars.unsupportedMediaTypeError)
   },
   "HTTP:TOO_MANY_REQUESTS": {
-    "code":429,
+    "code": 429,
     "reason": "Too Many Requests",
     "message": getMessage(vars.tooManyRequestsError)
-  },
-  "MULE:EXPRESSION": {
-    "code":500,
-    "reason": "Internal Server Error",
-    // Don't provide default error description for expression errors as that is a potential security issue.
-    "message":vars.expressionError default ""
   },
   "APIKIT:NOT_IMPLEMENTED": {
     "code": 501,

@@ -2,9 +2,9 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>ORG_ID_TOKEN</groupId>
+    <groupId>ORG_ID</groupId>
     <artifactId>api-error-handler</artifactId>
-    <version>6.3.0</version>
+    <version>6.3.2</version>
     <packaging>mule-extension</packaging>
 
     <name>Error Handler Plugin</name>
@@ -19,10 +19,11 @@
         <repo.url>https://maven.anypoint.mulesoft.com/api/v2/organizations/${project.groupId}/maven</repo.url>
 
         <!-- XML SDK properties -->
-        <mule.version>4.6.0</mule.version>
+        <mule.version>4.6.1</mule.version>
         <mule.extensions.maven.plugin.version>1.6.1</mule.extensions.maven.plugin.version>
-        <app.runtime>4.6.0</app.runtime>
+        <app.runtime>4.6.1</app.runtime>
         <!-- <munit.extensions.maven.plugin.version>1.2.0</munit.extensions.maven.plugin.version> -->
+         <tags>mule-plugin,mule-sdk-xml</tags>
     </properties>
 
     <distributionManagement>

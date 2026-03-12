@@ -118,7 +118,7 @@
                 type="string"
                 use="OPTIONAL"
                 displayName="500 Dataweave Expression Error"
-                defaultValue="Error with data transformation.  See log for details."
+                defaultValue="Error with data transformation. See log for details."
                 role="BEHAVIOUR"
                 tab="Common Errors"></parameter>
 
@@ -266,6 +266,7 @@
                 category="org.mulesoft.modules.errorhandler"
                 message='#[output application/java --- "Error HTTP Status: " ++ attributes.httpStatus default "" ++ "  Error Response: " ++ write(payload, "application/json") default ""]' />
         </body>
+
         <output type="OutputResponseType"></output>
         <output-attributes type="OutputAttributesType"></output-attributes>
 

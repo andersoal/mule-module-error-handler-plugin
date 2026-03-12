@@ -40,6 +40,7 @@
     - [Force All Errors to 500](#force-all-errors-to-500)
   - [Building](#building)
   - [Deploying](#deploying)
+    - [Syntax of Command](#syntax-of-command)
 
 ## API Error Handler Overview
 
@@ -155,7 +156,7 @@ This is a custom Mule module that is installed like any other connector, it is i
 
 ## Configuration
 
-This section describes how to configure and use the error handler in an app.  This module does not have a separate global configuration for ease of use.
+This section describes how to configure and use the error handler in an app. This module does not have a separate global configuration for ease of use.
 
 ### Maven Dependency
 
@@ -179,8 +180,8 @@ The groupId value must be the appropriate Anypoint Org Id where the module is de
 This replaces the generated error handling so a few steps have to be done to prepare the app to use the error handler.
 
 - Delete the APIKit's auto-generated error blocks (`on-error-propagate`/`on-error-continue`) before using this module.
-- Set the outbound HTTP Status variable, `vars.httpStatus` when using APIKit, from the HTTP status attribute set by the module: `attributes.httpStatus`.  This is how the status code is sent to the caller.
-- Update HTTP Listener's response values to properly use the generated body and HTTP status from the module.  See below.
+- Set the outbound HTTP Status variable, `vars.httpStatus` when using APIKit, from the HTTP status attribute set by the module: `attributes.httpStatus`. This is how the status code is sent to the caller.
+- Update HTTP Listener's response values to properly use the generated body and HTTP status from the module. See below.
 
 #### Update HTTP Listener Response
 
@@ -224,7 +225,7 @@ Add `vars.httpStatus` to the listener's `http:response` and `http:error-response
 
 An example of the full error handler flow is shown below.  This example uses the built-in logger for logging the error.
 
-![Error Handler Flow](./assets/handlerFlow.png "Error Handler Flow")
+![Error Handler Flow](./resources/handlerFlow.png "Error Handler Flow")
 
 ```xml
 <error-handler name="api-error-handler">
@@ -259,13 +260,13 @@ The response status code and error reason (phrase) _cannot_ be changed for commo
 - Additional errors not covered here can be mapped to the same status codes with the _Custom Errors_ feature.
 - If you want to change the status code or reason, use the _Custom Errors_ feature to override the desired APIKit or HTTP exceptions.
 
-![Common Errors Tab](./assets/commonErrors.png "Common Errors Tab")
+![Common Errors Tab](./resources/commonErrors.png "Common Errors Tab")
 
 ### Use Generated Error Message
 
 You can set the error message to the generated error description from the error object, `error.description`, based on the _Use Generated Error Description Instead_ selection.  If it evaluates to true, the generated error will be used as the error message.  If it evaluates to false, the user-provided message will be used.  This selection only applies to common errors.  It does not apply to custom errors.  If you want to add dynamic error messages via DataWeave, then set this to `false` and add the DataWeave into the message fields.
 
-![Use Generated Error](./assets/generatedError.png "Use Generated Error")
+![Use Generated Error](./resources/generatedError.png "Use Generated Error")
 
 **Note:** The only exception to using generated errors is the _DataWeave Expression Error_, which does not use the generated error description, regardless of the setting since this can be a security risk.  If you want to add the generated error to this error, you will have to explicitly do that in its message field.
 
@@ -277,7 +278,7 @@ You can set the error message to the generated error description from the error 
 
 You can add any number of custom error definitions for the module to include in the mapping.  This is done by defining these custom error mappings inline or in a [DataWeave file](https://docs.mulesoft.com/DataWeave/2.4/DataWeave-language-introduction#dwl_file).  The screenshot shows using a file.
 
-![Custom Errors Tab](./assets/customErrors.png "Custom Errors Tab")
+![Custom Errors Tab](./resources/customErrors.png "Custom Errors Tab")
 
 ### Using a File
 
@@ -406,7 +407,7 @@ There are some common functions provided by the module that you can use in your 
 
 General configuration is defined on the _Advanced_ tab.  This includes the _Error Object_ definition and _Use Previous Error_ feature.
 
-![Advanced Tab](./assets/advanced.png "Advanced Tab")
+![Advanced Tab](./resources/advanced.png "Advanced Tab")
 
 ### Error Object
 
