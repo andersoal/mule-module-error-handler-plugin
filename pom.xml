@@ -4,7 +4,7 @@
 
     <groupId>ORG_ID</groupId>
     <artifactId>api-error-handler</artifactId>
-    <version>6.3.2</version>
+    <version>6.3.1</version>
     <packaging>mule-extension</packaging>
 
     <name>Error Handler Plugin</name>
@@ -22,7 +22,7 @@
         <mule.version>4.6.1</mule.version>
         <mule.extensions.maven.plugin.version>1.6.1</mule.extensions.maven.plugin.version>
         <app.runtime>4.6.1</app.runtime>
-        <!-- <munit.extensions.maven.plugin.version>1.2.0</munit.extensions.maven.plugin.version> -->
+        <munit.extensions.maven.plugin.version>1.2.0</munit.extensions.maven.plugin.version>
          <tags>mule-plugin,mule-sdk-xml</tags>
     </properties>
 
@@ -65,7 +65,7 @@
             <plugin>
                 <groupId>com.mulesoft.munit</groupId>
                 <artifactId>munit-extensions-maven-plugin</artifactId>
-                <!-- <version>${munit.extensions.maven.plugin.version}</version> -->
+                <version>${munit.extensions.maven.plugin.version}</version>
                 <dependencies>
                     <dependency>
                         <!-- Ensure using correct version for runtime.  This plugin may not have latest in its POM. -->
