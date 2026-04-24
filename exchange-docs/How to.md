@@ -16,7 +16,7 @@ If you are using Maven, add the following dependency to your `pom.xml` file:
 ```xml
 <dependency>
     <groupId>${replace-with-group-id}</groupId>
-    <artifactId>mule-module-error-handler-plugin</artifactId>
+    <artifactId>error-handler-plugin</artifactId>
     <version>6.3.1</version>
     <classifier>mule-plugin</classifier>
 </dependency>

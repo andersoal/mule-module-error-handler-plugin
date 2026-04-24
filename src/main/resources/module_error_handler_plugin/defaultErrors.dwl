@@ -23,14 +23,19 @@ fun getMessage(message) =
   },
   // Custom error
   "VALIDATION:*": {
-    code        : 400,
-    reason      : "Bad Request",
-    message     : error.description,
+    code   : 400,
+    reason : "Bad Request",
+    message: error.description,
   },
   "OS:KEY_NOT_FOUND": {
     code   : 404,
     reason : "Key Not Found",
     message: "Some of the parameters was not found."
+  },
+  "MULE:DUPLICATE_MESSAGE": {
+    code   : 409,
+    reason : "Already Processing",
+    message: "A request is already being processed."
   },
   // Others HTTP:*
   "HTTP:BASIC_AUTHENTICATION"  : { code: 401, reason: "Unauthorized"          , message: getMessage(vars.unauthorizedError) },
@@ -39,123 +44,123 @@ fun getMessage(message) =
   "HTTP:TRANSFORMATION"        : { code: 500, reason: "Transformation Error"  , message: vars.expressionError default ""    },
   // List of all standard API-related errors.
   "APIKIT:BAD_REQUEST": {
-    "code": 400,
-    "reason": "Bad Request",
+    "code"   : 400,
+    "reason" : "Bad Request",
     "message": getMessage(vars.badRequestError)
   },
   "HTTP:BAD_REQUEST": {
-    "code": 400,
-    "reason": "Bad Request",
+    "code"   : 400,
+    "reason" : "Bad Request",
     "message": getMessage(vars.badRequestError)
   },
   "HTTP:PARSING": {
-    "code": 400,
-    "reason": "Bad Request",
+    "code"   : 400,
+    "reason" : "Bad Request",
     "message": getMessage(vars.badRequestError)
   },
   "HTTP:CLIENT_SECURITY": {
-    "code": 401,
-    "reason": "Unauthorized",
+    "code"   : 401,
+    "reason" : "Unauthorized",
     "message": getMessage(vars.unauthorizedError)
   },
   "HTTP:SECURITY": {
-    "code": 401,
-    "reason": "Unauthorized",
+    "code"   : 401,
+    "reason" : "Unauthorized",
     "message": getMessage(vars.unauthorizedError)
   },
   "MULE:SECURITY": {
-    "code": 401,
-    "reason": "Unauthorized",
+    "code"   : 401,
+    "reason" : "Unauthorized",
     "message": getMessage(vars.unauthorizedError)
   },
   "HTTP:UNAUTHORIZED": {
-    "code": 401,
-    "reason": "Unauthorized",
+    "code"   : 401,
+    "reason" : "Unauthorized",
     "message": getMessage(vars.unauthorizedError)
   },
   "HTTP:FORBIDDEN": {
-    "code": 403,
-    "reason": "Forbidden",
+    "code"   : 403,
+    "reason" : "Forbidden",
     "message": getMessage(vars.forbiddenError)
   },
   "HTTP:NOT_FOUND": {
-    "code": 404,
-    "reason": "Not Found",
+    "code"   : 404,
+    "reason" : "Not Found",
     "message": getMessage(vars.notFoundError)
   },
   "APIKIT:NOT_FOUND": {
-    "code": 404,
-    "reason": "Not Found",
+    "code"   : 404,
+    "reason" : "Not Found",
     "message": getMessage(vars.notFoundError)
   },
   "APIKIT:METHOD_NOT_ALLOWED": {
-    "code": 405,
-    "reason": "Method Not Allowed",
+    "code"   : 405,
+    "reason" : "Method Not Allowed",
     "message": getMessage(vars.methodNotAllowedError)
   },
   "HTTP:METHOD_NOT_ALLOWED": {
-    "code": 405,
-    "reason": "Method Not Allowed",
+    "code"   : 405,
+    "reason" : "Method Not Allowed",
     "message": getMessage(vars.methodNotAllowedError)
   },
   "APIKIT:NOT_ACCEPTABLE": {
-    "code": 406,
-    "reason": "Not Acceptable",
+    "code"   : 406,
+    "reason" : "Not Acceptable",
     "message": getMessage(vars.notAcceptableError)
   },
   "HTTP:NOT_ACCEPTABLE": {
-    "code": 406,
-    "reason": "Not Acceptable",
+    "code"   : 406,
+    "reason" : "Not Acceptable",
     "message": getMessage(vars.notAcceptableError)
   },
   "HTTP:TIMEOUT": {
-    "code": 408,
-    "reason": "Request Timeout",
+    "code"   : 408,
+    "reason" : "Request Timeout",
     "message": getMessage(vars.timeoutError)
   },
   "APIKIT:UNSUPPORTED_MEDIA_TYPE": {
-    "code": 415,
-    "reason": "Unsupported Media Type",
+    "code"   : 415,
+    "reason" : "Unsupported Media Type",
     "message": getMessage(vars.unsupportedMediaTypeError)
   },
   "HTTP:UNSUPPORTED_MEDIA_TYPE": {
-    "code": 415,
-    "reason": "Unsupported Media Type",
+    "code"   : 415,
+    "reason" : "Unsupported Media Type",
     "message": getMessage(vars.unsupportedMediaTypeError)
   },
   "HTTP:TOO_MANY_REQUESTS": {
-    "code": 429,
-    "reason": "Too Many Requests",
+    "code"   : 429,
+    "reason" : "Too Many Requests",
     "message": getMessage(vars.tooManyRequestsError)
   },
   "APIKIT:NOT_IMPLEMENTED": {
-    "code": 501,
-    "reason": "Not Implemented",
+    "code"   : 501,
+    "reason" : "Not Implemented",
     "message": getMessage(vars.notImplementedError)
   },
   "HTTP:NOT_IMPLEMENTED": {
-    "code": 501,
-    "reason": "Not Implemented",
+    "code"   : 501,
+    "reason" : "Not Implemented",
     "message": getMessage(vars.notImplementedError)
   },
   "HTTP:BAD_GATEWAY": {
-    "code": 502,
-    "reason": "Bad Gateway",
+    "code"   : 502,
+    "reason" : "Bad Gateway",
     "message": getMessage(vars.connectivityError)
   },
   "HTTP:CONNECTIVITY": {
-    "code": 503,
-    "reason": "Service Unavailable",
+    "code"   : 503,
+    "reason" : "Service Unavailable",
     "message": getMessage(vars.connectivityError)
   },
   "HTTP:RETRY_EXHAUSTED": {
-    "code": 503,
-    "reason": "Service Unavailable",
+    "code"   : 503,
+    "reason" : "Service Unavailable",
     "message": getMessage(vars.connectivityError)
   },
   "HTTP:SERVICE_UNAVAILABLE": {
-    "code": 503,
-    "reason": "Service Unavailable",
+    "code"   : 503,
+    "reason" : "Service Unavailable",
     "message": getMessage(vars.connectivityError)
   }
 }

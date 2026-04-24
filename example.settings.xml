@@ -7,13 +7,7 @@
             <password>nexus_password</password>
         </server>
         <server>
-            <id>anypoint-exchange-v2</id>
-            <username>~~~Client~~~</username>
-            <!-- connected app: org-devops-exchange -->
-            <password>client_id~?~client_secret</password>
-        </server>
-        <server>
-            <id>anypoint-exchange-v3</id>
+            <id>Repository</id>
             <username>~~~Client~~~</username>
             <!-- connected app: org-devops-exchange -->
             <password>client_id~?~client_secret</password>

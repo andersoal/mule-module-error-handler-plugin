@@ -2,9 +2,9 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>ORG_ID</groupId>
-    <artifactId>api-error-handler</artifactId>
-    <version>6.3.1</version>
+    <groupId>ORD_ID_TOKEN</groupId>
+    <artifactId>error-handler-plugin</artifactId>
+    <version>6.3.0</version>
     <packaging>mule-extension</packaging>
 
     <name>Error Handler Plugin</name>
@@ -15,8 +15,8 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Overridden by build.sh -->
-        <repo.id>anypoint-exchange-v2</repo.id>
-        <repo.url>https://maven.anypoint.mulesoft.com/api/v2/organizations/${project.groupId}/maven</repo.url>
+        <repo.id>Repository</repo.id>
+        <repo.url>https://maven.anypoint.mulesoft.com/api/v3/organizations/${project.groupId}/maven</repo.url>
 
         <!-- XML SDK properties -->
         <mule.version>4.6.1</mule.version>
@@ -74,6 +74,27 @@
                         <version>${mule.version}</version>
                     </dependency>
                 </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.mule.tools.maven</groupId>
+                <artifactId>exchange-mule-maven-plugin</artifactId>
+                <version>0.1.7</version>
+                <executions>
+                    <execution>
+                        <id>validate</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>exchange-pre-deploy</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>deploy</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>exchange-deploy</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
