@@ -4,7 +4,7 @@
 
     <groupId>ORD_ID_TOKEN</groupId>
     <artifactId>error-handler-plugin</artifactId>
-    <version>6.3.0</version>
+    <version>6.4.0</version>
     <packaging>mule-extension</packaging>
 
     <name>Error Handler Plugin</name>

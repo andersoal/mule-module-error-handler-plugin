@@ -203,7 +203,7 @@
             <mule:logger
                 level="DEBUG"
                 category="org.mulesoft.modules.errorhandler"
-                message='#[output aplication/java ---
+                message='#[output application/java ---
                     "Error type: " ++ (vars.errorType default "") ++ "  Error Description: " ++ (vars.error.description default "")]' />
 
             <!-- Load the default error definitions. -->
@@ -230,7 +230,11 @@
                         var responseKey = vars.responseKey
                         var responseError = error update {
                                 // Use the previous error message if it exists, otherwise use the provided message.
-                                case message at .message -> if (!isEmpty(vars.previousError)) vars.previousError else message
+                                // Binary previous errors (e.g. text/plain or binary HTTP error bodies) are converted to String so they can be written as JSON.
+                                case message at .message ->
+                                    if (isEmptyValue(vars.previousError)) message
+                                    else if (vars.previousError is Binary) toString(vars.previousError)
+                                    else vars.previousError
                             }
                         ---
                         if (!isEmpty(responseKey) and (responseKey is String))
@@ -264,7 +268,7 @@
             <mule:logger
                 level="DEBUG"
                 category="org.mulesoft.modules.errorhandler"
-                message='#[output application/java --- "Error HTTP Status: " ++ attributes.httpStatus default "" ++ "  Error Response: " ++ write(payload, "application/json") default ""]' />
+                message='#[output application/java --- "Error HTTP Status: $(attributes.httpStatus default 500)  Error Response: $(write(payload, "application/json") default "")"]' />
         </body>
 
         <output type="OutputResponseType"></output>

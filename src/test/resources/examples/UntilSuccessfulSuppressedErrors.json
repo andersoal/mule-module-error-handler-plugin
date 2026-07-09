@@ -1,0 +1,104 @@
+{
+  "dslSource": "<until-successful maxRetries=\"2\" doc:name=\"Until Successful\" millisBetweenRetries=\"100\"/>",
+  "suppressedErrors": [
+    {
+      "suppressedErrors": [],
+      "childErrors": [],
+      "errorType": {
+        "identifier": "SERVICE_UNAVAILABLE",
+        "parentErrorType": {
+          "identifier": "ANY",
+          "parentErrorType": null,
+          "namespace": "MULE"
+        },
+        "namespace": "HTTP"
+      },
+      "errorMessage": {
+        "inboundAttachmentNames": [],
+        "exceptionPayload": null,
+        "inboundPropertyNames": [],
+        "outboundAttachmentNames": [],
+        "payload": {
+          "error": {
+            "code": 503,
+            "reason": "Service Unavailable",
+            "message": "Downstream system unavailable (attempt 1)"
+          }
+        },
+        "outboundPropertyNames": [],
+        "attributes": {
+          "headers": {
+            "content-type": "application/json"
+          },
+          "reasonPhrase": "Service Unavailable",
+          "statusCode": 503
+        }
+      },
+      "cause": null,
+      "description": "HTTP GET on resource 'http://system-api/resource' failed: service unavailable (503).",
+      "detailedDescription": "HTTP GET on resource 'http://system-api/resource' failed: service unavailable (503).",
+      "failingComponent": "until-successful-flow/processors/0/processors/0"
+    },
+    {
+      "suppressedErrors": [],
+      "childErrors": [],
+      "errorType": {
+        "identifier": "SERVICE_UNAVAILABLE",
+        "parentErrorType": {
+          "identifier": "ANY",
+          "parentErrorType": null,
+          "namespace": "MULE"
+        },
+        "namespace": "HTTP"
+      },
+      "errorMessage": {
+        "inboundAttachmentNames": [],
+        "exceptionPayload": null,
+        "inboundPropertyNames": [],
+        "outboundAttachmentNames": [],
+        "payload": {
+          "error": {
+            "code": 503,
+            "reason": "Service Unavailable",
+            "message": "Downstream system unavailable (attempt 2)"
+          }
+        },
+        "outboundPropertyNames": [],
+        "attributes": {
+          "headers": {
+            "content-type": "application/json"
+          },
+          "reasonPhrase": "Service Unavailable",
+          "statusCode": 503
+        }
+      },
+      "cause": null,
+      "description": "HTTP GET on resource 'http://system-api/resource' failed: service unavailable (503).",
+      "detailedDescription": "HTTP GET on resource 'http://system-api/resource' failed: service unavailable (503).",
+      "failingComponent": "until-successful-flow/processors/0/processors/0"
+    }
+  ],
+  "childErrors": [],
+  "errorType": {
+    "identifier": "RETRY_EXHAUSTED",
+    "parentErrorType": {
+      "identifier": "ANY",
+      "parentErrorType": null,
+      "namespace": "MULE"
+    },
+    "namespace": "MULE"
+  },
+  "errorMessage": null,
+  "cause": {
+    "localizedMessage": "'until-successful' retries exhausted",
+    "errorMessage": null,
+    "cause": null,
+    "type": "RETRY_EXHAUSTED",
+    "message": "'until-successful' retries exhausted",
+    "suppressed": [],
+    "stackTrace": []
+  },
+  "description": "'until-successful' retries exhausted",
+  "detailedDescription": "'until-successful' retries exhausted",
+  "failingComponent": "until-successful-flow/processors/0"
+}

@@ -25,7 +25,8 @@ fun getMessage(message) =
   "VALIDATION:*": {
     code   : 400,
     reason : "Bad Request",
-    message: error.description,
+    // The error object is only available through vars.error inside the module's operation; a bare `error` resolves to null here.
+    message: vars.error.description default vars.badRequestError
   },
   "OS:KEY_NOT_FOUND": {
     code   : 404,

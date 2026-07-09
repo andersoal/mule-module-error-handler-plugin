@@ -123,6 +123,7 @@ This module may run on a runtime previous to the minimum listed, but it has not 
 | 5.0.0         | 4.3.0           |
 | 6.0.0 - 6.2.0 | 4.4.0           |
 | 6.3.0         | 4.6.0           |
+| 6.4.0         | 4.6.0           |
 
 ### Changes from versions previous to 6.0.0
 
@@ -324,23 +325,14 @@ import * from module_error_handler_plugin::common
 /**
  * Previous error nested in the Mule error object.
  * Provides the entire payload of the previous error as a String.
- * Handles the main Mule Error formats to get nested errors:
- * - Composite modules/scopes, like Scatter-Gather, Parallel-Foreach, Group Validation Module
- * - Until-Successful
+ * getPreviousErrorMessage handles the main Mule Error formats to get nested errors:
+ * - Composite modules/scopes, like Scatter-Gather, Parallel-Foreach, Group Validation Module (childErrors)
+ * - Until-Successful (suppressedErrors)
  * - Standard Error, like Raise Error, Foreach, and most connectors and errors.
+ * It is also safe for error payloads that are Binary or plain text (e.g. text/plain responses),
+ * which cannot be accessed with selectors and would otherwise fail the error handler.
  */
-var previousError = do {
-    var nested = [
-        error.childErrors..errorMessage.payload,        // Composite
-        error.suppressedErrors..errorMessage.payload,   // Until-Successful
-        error.exception.errorMessage.typedValue         // Standard Error: must go last because it has content if this is one of the other types of errors
-    ] dw::core::Arrays::firstWith !isEmpty($)
-    ---
-    if (nested is Array)
-        toString(nested map (toString($)) distinctBy $)
-    else
-        toString(nested)
-}
+var previousError = getPreviousErrorMessage(error)
 
 ---
 {
@@ -385,8 +377,8 @@ var previousError = do {
     If not found, the error.description will be returned, which generally says an internal server error occurred.
     */
     "MULE:UNKNOWN": {
-        code: error.exception.errorMessage.attributes.statusCode default 500,
-        reason: error.exception.errorMessage.attributes.reasonPhrase default "Internal Server Error",
+        code: evalOrElse(() -> error.exception.errorMessage.attributes.statusCode, 500) default 500,
+        reason: evalOrElse(() -> error.exception.errorMessage.attributes.reasonPhrase, "Internal Server Error") default "Internal Server Error",
         message: if (!isEmpty(previousError)) previousError else error.description
     }
 }
@@ -397,7 +389,10 @@ var previousError = do {
 There are some common functions provided by the module that you can use in your custom errors definition.  They are imported by `import * from module_error_handler_plugin::common`.
 
 - `getErrorTypeAsString`: Gets the string for the current Mule error type.  This corresponds to the _keys_ in the custom error object.  Example: `HTTP:INTERNAL_SERVER_ERROR`.
-- `toString`: Converts any type to a string.  If not a string, it uses write() with Java format.  If empty, then returns empty string or the value specified in the second parameter.
+- `toString`: Converts any type to a string.  If not a string, it uses write() with Java format.  If empty, then returns empty string or the value specified in the second parameter.  Binary content is read as text; content that cannot be read as text is returned as Base64 instead of failing.
+- `getPreviousErrorMessage`: Gets the previous (nested) error message from the Mule error object as a String.  It handles `childErrors` (composite scopes like Scatter-Gather and Parallel For-Each, and the Validation module's _All_ aggregation), `suppressedErrors` (Until-Successful retries), and standard connector errors.  Duplicate nested messages are removed.  It is safe for error payloads that are Binary or plain text (e.g. `text/plain` responses), which would fail with direct selectors like `error.errorMessage.payload.message`.
+- `isEmptyValue`: Behaves like `isEmpty()` but never fails on types `isEmpty()` does not support, like Binary.  A Binary value is considered empty when its text content is empty.
+- `evalOrElse`: Safely evaluates a zero-argument function and returns the provided fallback if the evaluation fails.  Useful for guarding selectors on values that may be Binary or plain text, e.g. `evalOrElse(() -> error.errorMessage.payload.message, "")`.
 
 [⬆️Table of Contents](#table-of-contents)
 
@@ -417,7 +412,7 @@ The error object definition takes the standard [Mule Error](https://docs.mulesof
 
 Connectors usually generate error responses their own error responses and wrap the actual error response from the external system in the error object. This causes the external system's response to be lost and not propagated back to the API's caller.  The previous error feature allows the module to retrieve the external system's error response from the error object and use that as the error message.
 
-A common scenario is when a system API generates an error that needs to get propagated back to the caller of the experience or process API.  Using normal error handling, like `error.description`, the SOAP fault or `500` response from the called system is not logged or propagated.  These items are nested in the error object here: `error.exception.errorMessage.typedValue.payload` and `error.exception.errorMessage.typedValue.attributes`.  Be aware that payload and attributes won't be accessible by selector if the content is `Binary`.  If the type is `Binary`, then you must read the error payload, `error.exception.errorMessage.typedValue`, as the correct MIME type if you want to access a specific field using a selector.
+A common scenario is when a system API generates an error that needs to get propagated back to the caller of the experience or process API.  Using normal error handling, like `error.description`, the SOAP fault or `500` response from the called system is not logged or propagated.  These items are nested in the error object here: `error.exception.errorMessage.typedValue.payload` and `error.exception.errorMessage.typedValue.attributes`.  Be aware that payload and attributes won't be accessible by selector if the content is `Binary` or plain text (e.g. a `text/plain` response); attempting a selector like `error.errorMessage.payload.message` on such content fails the error handler itself.  Use the `getPreviousErrorMessage` common function, which converts Binary and plain-text payloads to Strings safely, or guard individual selectors with `evalOrElse`.  If you need to access a specific field of a `Binary` payload with a selector, you must first read the error payload, `error.exception.errorMessage.typedValue`, as the correct MIME type.
 
 This feature will automatically replace the `message` field for _**all errors**_ with the previous error defined by the provided DataWeave if one exists.  If the previous error does not exist or is empty, then it will leave the `message` field with its current value.  This feature does not append the previous error to the current one.  It simply replaces and is best used to propagate downstream errors up the API stack.
 
@@ -487,8 +482,8 @@ This propagates the HTTP status code, reasonPhrase, and message from the externa
 
 ```js,dw,DataWeave
     "MULE:UNKNOWN": {
-        code: error.exception.errorMessage.attributes.statusCode default 500,
-        reason: error.exception.errorMessage.attributes.reasonPhrase default "Internal Server Error",
+        code: evalOrElse(() -> error.exception.errorMessage.attributes.statusCode, 500) default 500,
+        reason: evalOrElse(() -> error.exception.errorMessage.attributes.reasonPhrase, "Internal Server Error") default "Internal Server Error",
         message: if (!isEmpty(previousError)) previousError else error.description
     }
 ```
