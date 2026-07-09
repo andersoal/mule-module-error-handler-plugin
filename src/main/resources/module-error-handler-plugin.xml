@@ -191,80 +191,230 @@
 
         </parameters>
 
+        <!--
+            ====================================================================
+            DEFENSIVE ARCHITECTURE:
+            
+            The entire operation body is wrapped in a <try> scope because
+            'error' itself can be null, corrupted, or fatally inaccessible.
+            When even reading 'error.description' throws a fatal, the
+            <on-error-continue> produces a safe 500 response instead of
+            propagating the fatal.
+            
+            This is critical for XML SDK modules where the 'error' context
+            variable may not be available outside error handlers.
+            ====================================================================
+        -->
         <body>
-            <mule:set-variable
-                value="#[output application/java
-                    import getErrorTypeAsString from module_error_handler_plugin::common
-                    ---
-                    getErrorTypeAsString(vars.error.errorType)]"
-                doc:name="Error Type"
-                variableName="errorType" />
+            <mule:try doc:name="Safe Error Processing Wrapper">
 
-            <mule:logger
-                level="DEBUG"
-                category="org.mulesoft.modules.errorhandler"
-                message='#[output aplication/java ---
-                    "Error type: " ++ (vars.errorType default "") ++ "  Error Description: " ++ (vars.error.description default "")]' />
-
-            <!-- Load the default error definitions. -->
-            <mule:set-variable
-                value="#[${file::module_error_handler_plugin/defaultErrors.dwl}]"
-                doc:name="Default Errors"
-                variableName="defaultErrors" />
-
-            <mule:logger
-                level="DEBUG"
-                message="Default Errors: #[vars.defaultErrors]"
-                category="org.mulesoft.modules.errorhandler"></mule:logger>
-            <mule:logger
-                level="DEBUG"
-                message="Custom Errors: #[vars.customErrors]"
-                category="org.mulesoft.modules.errorhandler"></mule:logger>
-
-            <ee:transform doc:name="Set payload to error">
-                <ee:message>
-                    <ee:set-payload><![CDATA[%dw 2.0
-                        import * from module_error_handler_plugin::common
-                        output application/json
-                        var error = getError(vars.errorType, vars.defaultErrors, vars.customErrors default {})
-                        var responseKey = vars.responseKey
-                        var responseError = error update {
-                                // Use the previous error message if it exists, otherwise use the provided message.
-                                case message at .message -> if (!isEmpty(vars.previousError)) vars.previousError else message
-                            }
+                <!--
+                    Step 1: Normalize the error object with safe defaults.
+                    If vars.error is null or missing critical fields, coerce it
+                    into a usable structure so downstream DataWeave never sees
+                    a null error object.
+                -->
+                <mule:set-variable
+                    doc:name="Safe Error Object"
+                    variableName="safeError">
+                    <mule:value><![CDATA[#[output application/java
                         ---
-                        if (!isEmpty(responseKey) and (responseKey is String))
-                            {
-                                (responseKey): responseError
-                            }
+                        // Defensive: if error is null or fatally broken,
+                        // build a minimal safe error object so the rest of
+                        // the flow never encounters a null.
+                        if ( vars.error != null
+                             and (vars.error.errorType != null or vars.error.description != null)
+                           )
+                            vars.error
                         else
-                            responseError
-                        ]]>
-                    </ee:set-payload>
-                    <ee:set-attributes><![CDATA[%dw 2.0
-                        import * from module_error_handler_plugin::common
-                        output application/java
-                        var error           = getError(vars.errorType, vars.defaultErrors, vars.customErrors default {})
-                        var code            = error.code default 500
-                        var message         = toString(error.message, "Internal Server Error")
-                        var previousMessage = toString(vars.previousError)
-                        var description     = toString(vars.error.description)
+                            {
+                                errorType: {
+                                    namespace: "MULE",
+                                    identifier: "UNKNOWN"
+                                },
+                                description: (vars.error default {}).description
+                                    default "An unexpected error occurred",
+                                childErrors: (vars.error default {}).childErrors default [],
+                                suppressedErrors: (vars.error default {}).suppressedErrors default []
+                            }
+                    ]]></mule:value>
+                </mule:set-variable>
 
-                        // Concatenate current error message, previous error message, and error description without duplicates or empties
-                        var log = (([message, previousMessage, description] filter !isEmpty($)) distinctBy $) joinBy " | "
+                <!--
+                    Step 2: Resolve error type string with try/catch in DataWeave.
+                    Even safeError.errorType could be a Java exception type that
+                    DataWeave cannot serialize. The try{}catch{} ensures we
+                    always get a string, never a fatal.
+                -->
+                <mule:set-variable
+                    doc:name="Error Type"
+                    variableName="errorType">
+                    <mule:value><![CDATA[#[output application/java
+                        import getErrorTypeAsString from module_error_handler_plugin::common
                         ---
-                        {
-                            httpStatus: code as Number,
-                            errorLog: log
-                        }]]>
-                    </ee:set-attributes>
-                </ee:message>
-            </ee:transform>
+                        // Use safeError (guaranteed non-null) instead of raw error.
+                        // Wrap in try/catch because some errorType objects are
+                        // Java internals that DataWeave cannot introspect.
+                        try
+                            getErrorTypeAsString(vars.safeError.errorType)
+                        catch(e)
+                            "MULE:UNKNOWN"
+                    ]]></mule:value>
+                </mule:set-variable>
 
-            <mule:logger
-                level="DEBUG"
-                category="org.mulesoft.modules.errorhandler"
-                message='#[output application/java --- "Error HTTP Status: " ++ attributes.httpStatus default "" ++ "  Error Response: " ++ write(payload, "application/json") default ""]' />
+                <mule:logger
+                    level="DEBUG"
+                    category="org.mulesoft.modules.errorhandler"
+                    doc:name="Log Error Type">
+                    <mule:message><![CDATA[#[output application/java ---
+                        try
+                            "Error type: " ++ (vars.errorType default "")
+                                ++ "  Error Description: "
+                                ++ (vars.safeError.description default "")
+                        catch(e)
+                            "Error type: UNKNOWN  Error Description: [inaccessible]"
+                    ]]></mule:message>
+                </mule:logger>
+
+                <!-- Load the default error definitions. -->
+                <mule:set-variable
+                    value="#[${file::module_error_handler_plugin/defaultErrors.dwl}]"
+                    doc:name="Default Errors"
+                    variableName="defaultErrors" />
+
+                <mule:logger
+                    level="DEBUG"
+                    message="Default Errors: #[vars.defaultErrors]"
+                    category="org.mulesoft.modules.errorhandler"
+                    doc:name="Log Default Errors" />
+                <mule:logger
+                    level="DEBUG"
+                    message="Custom Errors: #[vars.customErrors]"
+                    category="org.mulesoft.modules.errorhandler"
+                    doc:name="Log Custom Errors" />
+
+                <!--
+                    Step 3: Build the response payload and attributes.
+                    All error field access uses vars.safeError (never null) and
+                    every DataWeave expression is wrapped in try{}catch{}.
+                -->
+                <ee:transform doc:name="Set payload to error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+                            import * from module_error_handler_plugin::common
+                            output application/json
+
+                            // safeError is guaranteed non-null from Step 1.
+                            var errorEntry = getError(vars.errorType, vars.defaultErrors, vars.customErrors default {})
+                            var responseKey = vars.responseKey
+                            var responseError = errorEntry update {
+                                    // Use the previous error message if it exists,
+                                    // otherwise use the provided message.
+                                    case message at .message -> if (!isEmpty(vars.previousError)) vars.previousError else message
+                                }
+                            ---
+                            if (!isEmpty(responseKey) and (responseKey is String))
+                                {
+                                    (responseKey): responseError
+                                }
+                            else
+                                responseError
+                            ]]>
+                        </ee:set-payload>
+                        <ee:set-attributes><![CDATA[%dw 2.0
+                            import * from module_error_handler_plugin::common
+                            output application/java
+
+                            // safeError.description is guaranteed non-null from Step 1.
+                            var errorEntry    = getError(vars.errorType, vars.defaultErrors, vars.customErrors default {})
+                            var code          = errorEntry.code default 500
+                            var message       = toString(errorEntry.message, "Internal Server Error")
+                            var previousMsg   = toString(vars.previousError)
+
+                            // Extra defensive: safeError.description could still fail
+                            // if the underlying object is a corrupted Java exception.
+                            var description   = try toString(vars.safeError.description) catch(e) ""
+
+                            // Concatenate current error message, previous error message,
+                            // and error description without duplicates or empties.
+                            var log = (([message, previousMsg, description] filter !isEmpty($)) distinctBy $) joinBy " | "
+                            ---
+                            {
+                                httpStatus: code as Number,
+                                errorLog: log
+                            }]]>
+                        </ee:set-attributes>
+                    </ee:message>
+                </ee:transform>
+
+                <mule:logger
+                    level="DEBUG"
+                    category="org.mulesoft.modules.errorhandler"
+                    doc:name="Log Error Response">
+                    <mule:message><![CDATA[#[output application/java ---
+                        try
+                            "Error HTTP Status: " ++ (attributes.httpStatus default "")
+                                ++ "  Error Response: "
+                                ++ (write(payload, "application/json") default "")
+                        catch(e)
+                            "Error HTTP Status: 500  Error Response: [unwritable]"
+                    ]]></mule:message>
+                </mule:logger>
+
+                <!--
+                    ====================================================================
+                    FATAL ERROR HANDLER:
+                    
+                    If ANY step above throws (including reading error.description),
+                    produce a safe 500 response instead of propagating the fatal.
+                    This is the safety net that prevents the plugin from crashing
+                    the entire error handling flow.
+                    ====================================================================
+                -->
+                <mule:error-handler>
+                    <mule:on-error-continue
+                        enableNotifications="true"
+                        logException="true"
+                        doc:name="On Fatal - Safe Fallback">
+
+                        <mule:logger
+                            level="ERROR"
+                            category="org.mulesoft.modules.errorhandler"
+                            message="FATAL: Error Handler Plugin crashed while processing error. Returning safe 500 fallback. Original error: #[vars.error]"
+                            doc:name="Log Fatal Fallback" />
+
+                        <ee:transform doc:name="Safe 500 Fallback Response">
+                            <ee:message>
+                                <ee:set-payload><![CDATA[%dw 2.0
+                                    output application/json
+                                    var key = vars.responseKey default "error"
+                                    var safeResponse = {
+                                        code: 500,
+                                        reason: "Internal Server Error",
+                                        message: "An unexpected error occurred while processing the error response"
+                                    }
+                                    ---
+                                    if (!isEmpty(key) and (key is String))
+                                        { (key): safeResponse }
+                                    else
+                                        safeResponse
+                                ]]></ee:set-payload>
+                                <ee:set-attributes><![CDATA[%dw 2.0
+                                    output application/java
+                                    var desc = try vars.safeError.description catch(e) ""
+                                    ---
+                                    {
+                                        httpStatus: 500,
+                                        errorLog: "Error Handler Plugin fatal fallback"
+                                            ++ (if (!isEmpty(desc)) " | " ++ desc else "")
+                                    }]]></ee:set-attributes>
+                            </ee:message>
+                        </ee:transform>
+
+                    </mule:on-error-continue>
+                </mule:error-handler>
+
+            </mule:try>
         </body>
 
         <output type="OutputResponseType"></output>
