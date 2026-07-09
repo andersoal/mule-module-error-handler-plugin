@@ -1,0 +1,56 @@
+{
+  "_description": "Simulates Scatter-Gather error with null parent payload but valid childErrors",
+  "errorType": {
+    "namespace": "MULE",
+    "identifier": "COMPOSITE_ROUTING"
+  },
+  "description": "All routes failed in Scatter-Gather",
+  "childErrors": [
+    {
+      "errorType": {
+        "namespace": "HTTP",
+        "identifier": "NOT_FOUND"
+      },
+      "description": "Route 1: User service returned 404",
+      "errorMessage": {
+        "payload": {
+          "error": "User not found",
+          "userId": "12345"
+        },
+        "attributes": {
+          "statusCode": 404,
+          "reasonPhrase": "Not Found"
+        }
+      }
+    },
+    {
+      "errorType": {
+        "namespace": "HTTP",
+        "identifier": "TIMEOUT"
+      },
+      "description": "Route 2: Order service timed out",
+      "errorMessage": {
+        "payload": {
+          "error": "Request timeout",
+          "service": "order-service"
+        },
+        "attributes": {
+          "statusCode": 408,
+          "reasonPhrase": "Request Timeout"
+        }
+      }
+    },
+    {
+      "errorType": {
+        "namespace": "DB",
+        "identifier": "CONNECTIVITY"
+      },
+      "description": "Route 3: Database connection failed",
+      "errorMessage": {
+        "payload": null,
+        "attributes": {}
+      }
+    }
+  ],
+  "suppressedErrors": []
+}
