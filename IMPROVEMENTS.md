@@ -2,7 +2,7 @@
 
 ## Summary of Changes (2026-07-09)
 
-This document describes the improvements made to the Error Handler Plugin to enhance robustness when handling various error payload types, particularly edge cases like `text/plain`, binary content, null payloads, and deeply nested composite errors.
+This document describes the improvements made to the Error Handler Plugin to enhance robustness when handling various error payload types, particularly edge cases like `text/plain`, binary content, null payloads, deeply nested composite errors, and **fatal crashes when the error object itself is inaccessible**.
 
 ---
 
@@ -78,7 +78,113 @@ var previousError = getPreviousErrorMessage(error)
 
 ---
 
-## 2. Updated `customErrors.dwl` Example
+## 2. Fatal Error Handling in Module XML (CRITICAL)
+
+### Problem
+When the `error` object itself is **corrupted, null, or fatally inaccessible**, even reading `error.description` or `error.errorType` throws a **fatal exception** that crashes the entire error handling flow. This happens when:
+- `#[error]` is evaluated outside an error handler context
+- The error object is a Java exception that DataWeave cannot serialize
+- `error.errorType` is an internal Java class that DataWeave cannot introspect
+- The error object has been garbage-collected or is in an invalid state
+
+**Before this fix:** The module would throw a fatal, the API would return no response, and the caller would get a connection timeout.
+
+### Solution
+The entire operation body is now wrapped in a **`<try>` scope with `<on-error-continue>`**:
+
+```xml
+<mule:try doc:name="Safe Error Processing Wrapper">
+    <!-- Normal processing steps -->
+    <mule:error-handler>
+        <mule:on-error-continue doc:name="On Fatal - Safe Fallback">
+            <!-- Returns guaranteed 500 response -->
+        </mule:on-error-continue>
+    </mule:error-handler>
+</mule:try>
+```
+
+### Three-Layer Defense
+
+#### Layer 1: Safe Error Object Normalization
+Before any DataWeave script touches the error, a `safeError` variable is created with guaranteed non-null fields:
+
+```xml
+<mule:set-variable variableName="safeError">
+    <mule:value><![CDATA[#[
+        if ( vars.error != null
+             and (vars.error.errorType != null or vars.error.description != null)
+           )
+            vars.error
+        else
+            {
+                errorType: { namespace: "MULE", identifier: "UNKNOWN" },
+                description: (vars.error default {}).description
+                    default "An unexpected error occurred",
+                childErrors: (vars.error default {}).childErrors default [],
+                suppressedErrors: (vars.error default {}).suppressedErrors default []
+            }
+    ]]></mule:value>
+</mule:set-variable>
+```
+
+**Key point:** Downstream DataWeave scripts use `vars.safeError` (guaranteed non-null) instead of `vars.error` (potentially fatal).
+
+#### Layer 2: Try/Catch in DataWeave
+Every DataWeave expression that accesses error fields is wrapped in `try {} catch() {}`:
+
+```dataweave
+// Error type resolution
+try
+    getErrorTypeAsString(vars.safeError.errorType)
+catch(e)
+    "MULE:UNKNOWN"
+
+// Description access
+try
+    "Error Description: " ++ (vars.safeError.description default "")
+catch(e)
+    "Error Description: [inaccessible]"
+
+// Log writing
+try
+    write(payload, "application/json") default ""
+catch(e)
+    "[unwritable]"
+```
+
+#### Layer 3: Catastrophic Fallback
+If **any** step in the body still throws (e.g., a corrupted Java exception that crashes DataWeave), the `<on-error-continue>` produces a guaranteed valid response:
+
+```json
+{
+  "error": {
+    "code": 500,
+    "reason": "Internal Server Error",
+    "message": "An unexpected error occurred while processing the error response"
+  }
+}
+```
+
+With attributes:
+```json
+{
+  "httpStatus": 500,
+  "errorLog": "Error Handler Plugin fatal fallback"
+}
+```
+
+### Result
+| Scenario | Before | After |
+|----------|--------|-------|
+| `error` is null | Fatal crash | 500 with safe fallback |
+| `error.errorType` is unreadable Java class | Fatal crash | MULE:UNKNOWN + 500 |
+| `error.description` throws on access | Fatal crash | "[inaccessible]" + 500 |
+| DataWeave cannot serialize payload | Fatal crash | 500 with fallback JSON |
+| Module called outside error handler | Fatal crash | 500 with safe fallback |
+
+---
+
+## 3. Updated `customErrors.dwl` Example
 
 The example file has been refactored to:
 - Use `getPreviousErrorMessage()` instead of manual error extraction
@@ -88,7 +194,7 @@ The example file has been refactored to:
 
 ---
 
-## 3. MUnit Test Suite
+## 4. MUnit Test Suite
 
 Created `src/test/munit/error-handler-plugin-test-suite.xml` with **18 test cases** across 6 categories:
 
@@ -122,7 +228,7 @@ Created `src/test/munit/error-handler-plugin-test-suite.xml` with **18 test case
 
 ---
 
-## 4. New Test Fixtures (5 JSON files)
+## 5. New Test Fixtures (5 JSON files)
 
 | Fixture | Description |
 |---------|-------------|
@@ -134,13 +240,20 @@ Created `src/test/munit/error-handler-plugin-test-suite.xml` with **18 test case
 
 ---
 
-## 5. Code Cleanup
+## 6. Code Cleanup
 
 ### `toString()` Function Improvements
 - Added try/catch for `Binary` type conversion
 - Added explicit `Null` type handling
 - Added nested try/catch for complex object serialization failures
 - Returns `"[Binary content]"` as fallback for unreadable binary data
+
+### Module XML Defensive Architecture
+- Entire operation body wrapped in `<try>` with `<on-error-continue>`
+- `safeError` variable guarantees non-null error object for DataWeave
+- All `vars.error` references replaced with `vars.safeError`
+- All DataWeave error access wrapped in `try {} catch() {}`
+- Catastrophic fallback produces guaranteed valid 500 JSON response
 
 ### Documentation
 - All new functions have comprehensive doc comments with `@p` param and `@r` return tags
@@ -155,7 +268,7 @@ All changes are **backward compatible**:
 - Existing `getErrorTypeAsString()` and `getError()` functions are unchanged
 - Existing `toString()` function is enhanced but maintains same signature
 - New functions are additive only
-- The module XML (`module-error-handler-plugin.xml`) is unchanged
+- The module XML behavior is unchanged for normal cases — only adds safety for edge cases
 - Existing custom error definitions continue to work
 
 ---
@@ -202,7 +315,8 @@ reason: getReasonPhrase(error)
 
 | File | Change |
 |------|--------|
-| `src/main/resources/module_error_handler_plugin/common.dwl` | Enhanced with 6 new safe functions |
+| `src/main/resources/module-error-handler-plugin.xml` | Wrapped body in try/catch, added safeError normalization, added catastrophic fallback |
+| `src/main/resources/module_error_handler_plugin/common.dwl` | Enhanced with 6 new safe functions + improved toString() |
 | `examples/customErrors.dwl` | Refactored to use new safe patterns |
 | `src/test/munit/error-handler-plugin-test-suite.xml` | New — 18 MUnit tests |
 | `src/test/resources/examples/TextPlainPayloadError.json` | New test fixture |
@@ -211,3 +325,4 @@ reason: getReasonPhrase(error)
 | `src/test/resources/examples/MixedPayloadTypesError.json` | New test fixture |
 | `src/test/resources/examples/DeeplyNestedCompositeError.json` | New test fixture |
 | `IMPROVEMENTS.md` | New — this documentation file |
+| `README.md` | Expanded with improvements overview and quick start |
