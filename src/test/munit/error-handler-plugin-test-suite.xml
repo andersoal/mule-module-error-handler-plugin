@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns:module-error-handler-plugin="http://www.mulesoft.org/schema/mule/module-error-handler-plugin"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/module-error-handler-plugin http://www.mulesoft.org/schema/mule/module-error-handler-plugin/current/mule-module-error-handler-plugin.xsd">
+
+    <munit:config name="error-handler-plugin-test-suite">
+        <munit:parameterizations>
+            <!-- Parameterized test configurations can be added here -->
+        </munit:parameterizations>
+    </munit:config>
+
+    <!-- ================================================================= -->
+    <!--  TEST FLOW: error-generator                                       -->
+    <!--  Simulates various error types for testing the plugin             -->
+    <!-- ================================================================= -->
+    <flow name="error-generator-flow">
+        <choice>
+            <when expression="#[vars.scenario == 'HTTP_NOT_FOUND']">
+                <raise-error type="HTTP:NOT_FOUND" description="The requested resource was not found"/>
+            </when>
+            <when expression="#[vars.scenario == 'HTTP_TIMEOUT']">
+                <raise-error type="HTTP:TIMEOUT" description="Request timed out after 30000ms"/>
+            </when>
+            <when expression="#[vars.scenario == 'HTTP_CONNECTIVITY']">
+                <raise-error type="HTTP:CONNECTIVITY" description="Connection refused to downstream service"/>
+            </when>
+            <when expression="#[vars.scenario == 'VALIDATION_ERROR']">
+                <raise-error type="VALIDATION:INVALID_PARAMETER" description="Invalid parameter provided"/>
+            </when>
+            <when expression="#[vars.scenario == 'EXPRESSION_ERROR']">
+                <raise-error type="MULE:EXPRESSION" description="DataWeave transformation failed"/>
+            </when>
+            <otherwise>
+                <raise-error type="MULE:UNKNOWN" description="Unknown error occurred"/>
+            </otherwise>
+        </choice>
+    </flow>
+
+    <!-- ================================================================= -->
+    <!--  CATEGORY 1: STANDARD HTTP ERROR TESTS                            -->
+    <!-- ================================================================= -->
+
+    <munit:test name="test-http-not-found-standard-error" doc:description="Verify HTTP:NOT_FOUND returns 404 with correct payload">
+        <munit:execution>
+            <flow-ref name="run-process-error-with-raised-error">
+                <munit:parameters>
+                    <munit:parameter name="errorType" value="HTTP:NOT_FOUND"/>
+                    <munit:parameter name="description" value="The requested resource was not found"/>
+                </munit:parameters>
+            </flow-ref>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(404)]"/>
+            <munit-tools:assert-that expression="# [payload.error.code]" is="# [MunitTools::equalTo(404)]"/>
+            <munit-tools:assert-that expression="# [payload.error.reason]" is="# [MunitTools::equalTo('Not Found')]"/>
+            <munit-tools:assert-that expression="# [payload.error.message]" is="# [MunitTools::equalTo('The resource is not found')]"/>
+            <munit-tools:assert-that expression="# [attributes.errorLog]" is="# [MunitTools::containsString('The resource is not found')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-http-timeout-standard-error" doc:description="Verify HTTP:TIMEOUT returns 408 with timeout message">
+        <munit:execution>
+            <flow-ref name="run-process-error-with-raised-error">
+                <munit:parameters>
+                    <munit:parameter name="errorType" value="HTTP:TIMEOUT"/>
+                    <munit:parameter name="description" value="Request timed out after 30000ms"/>
+                </munit:parameters>
+            </flow-ref>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(408)]"/>
+            <munit-tools:assert-that expression="# [payload.error.code]" is="# [MunitTools::equalTo(408)]"/>
+            <munit-tools:assert-that expression="# [payload.error.reason]" is="# [MunitTools::equalTo('Request Timeout')]"/>
+            <munit-tools:assert-that expression="# [attributes.errorLog]" is="# [MunitTools::containsString('timed out')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-http-connectivity-standard-error" doc:description="Verify HTTP:CONNECTIVITY returns 503">
+        <munit:execution>
+            <flow-ref name="run-process-error-with-raised-error">
+                <munit:parameters>
+                    <munit:parameter name="errorType" value="HTTP:CONNECTIVITY"/>
+                    <munit:parameter name="description" value="Connection refused to downstream service"/>
+                </munit:parameters>
+            </flow-ref>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(503)]"/>
+            <munit-tools:assert-that expression="# [payload.error.code]" is="# [MunitTools::equalTo(503)]"/>
+            <munit-tools:assert-that expression="# [payload.error.reason]" is="# [MunitTools::equalTo('Service Unavailable')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-expression-error-security" doc:description="Verify MULE:EXPRESSION does NOT expose generated error (security)">
+        <munit:execution>
+            <flow-ref name="run-process-error-with-raised-error">
+                <munit:parameters>
+                    <munit:parameter name="errorType" value="MULE:EXPRESSION"/>
+                    <munit:parameter name="description" value="DataWeave transformation failed - sensitive info here"/>
+                </munit:parameters>
+            </flow-ref>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(500)]"/>
+            <munit-tools:assert-that expression="# [payload.error.code]" is="# [MunitTools::equalTo(500)]"/>
+            <!-- Message should be the configured expression error, NOT the generated description -->
+            <munit-tools:assert-that expression="# [payload.error.message]" is="# [MunitTools::equalTo('Error with data transformation. See log for details.')]"/>
+            <!-- Security: generated description should NOT be in the response -->
+            <munit-tools:assert-that expression="# [payload.error.message]" is="# [MunitTools::not(MunitTools::containsString('sensitive info'))]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ================================================================= -->
+    <!--  CATEGORY 2: COMPOSITE ERRORS WITH CHILDERRORS                    -->
+    <!--  Tests Scatter-Gather, Parallel-Foreach, Validation:ALL patterns  -->
+    <!-- ================================================================= -->
+
+    <munit:test name="test-scatter-gather-child-errors" doc:description="Verify Scatter-Gather childErrors are extracted and logged">
+        <munit:execution>
+            <set-variable variableName="testError" value="#[readUrl('classpath://examples/ScatterGather.json', 'application/json')]"/>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <!-- Should extract child error details from composite structure -->
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(500)]"/>
+            <munit-tools:assert-that expression="# [payload.error.code]" is="# [MunitTools::equalTo(500)]"/>
+            <!-- errorLog should contain child error information -->
+            <munit-tools:assert-that expression="# [attributes.errorLog]" is="# [MunitTools::not(MunitTools::isEmptyString())]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-parallel-foreach-child-errors" doc:description="Verify Parallel-Foreach childErrors are handled safely">
+        <munit:execution>
+            <set-variable variableName="testError" value="#[readUrl('classpath://examples/ParallelForeachError.json', 'application/json')]"/>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(500)]"/>
+            <munit-tools:assert-that expression="# [payload.error]" is="# [MunitTools::not(MunitTools::isNullValue())]"/>
+            <!-- Should not throw even with complex nested childErrors -->
+            <munit-tools:assert-that expression="# [attributes.errorLog]" is="# [MunitTools::not(MunitTools::isNullValue())]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-validation-all-child-errors" doc:description="Verify Validation:ALL childErrors are extracted">
+        <munit:execution>
+            <set-variable variableName="testError" value="#[readUrl('classpath://examples/MultiValidationModuleError.json', 'application/json')]"/>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(400)]"/>
+            <munit-tools:assert-that expression="# [payload.error.code]" is="# [MunitTools::equalTo(400)]"/>
+            <munit-tools:assert-that expression="# [payload.error.reason]" is="# [MunitTools::equalTo('Bad Request')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ================================================================= -->
+    <!--  CATEGORY 3: SUPPRESSED ERRORS                                    -->
+    <!--  Tests Until-Successful and Validation:ANY patterns               -->
+    <!-- ================================================================= -->
+
+    <munit:test name="test-until-successful-suppressed-errors" doc:description="Verify Until-Successful suppressedErrors are handled">
+        <munit:execution>
+            <set-variable variableName="testError" value="#[readUrl('classpath://examples/UntilSuccessfulError.json', 'application/json')]"/>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(500)]"/>
+            <munit-tools:assert-that expression="# [payload.error]" is="# [MunitTools::not(MunitTools::isNullValue())]"/>
+            <!-- Should handle suppressed errors without breaking -->
+            <munit-tools:assert-that expression="# [attributes.errorLog]" is="# [MunitTools::not(MunitTools::isNullValue())]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ================================================================= -->
+    <!--  CATEGORY 4: CUSTOM ERRORS WITH PREVIOUS ERROR EXTRACTION         -->
+    <!-- ================================================================= -->
+
+    <munit:test name="test-custom-errors-with-previous-error" doc:description="Verify custom error with getPreviousErrorMessage works">
+        <munit:execution>
+            <set-variable variableName="testError" value="#[readUrl('classpath://examples/ScatterGather.json', 'application/json')]"/>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                customErrors="#[${file::examples/customErrors.dwl}]"/>
+        </munit:execution>
+        <munit:validation>
+            <!-- Custom errors should override defaults where defined -->
+            <munit-tools:assert-that expression="# [payload.error]" is="# [MunitTools::not(MunitTools::isNullValue())]"/>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::not(MunitTools::isNullValue())]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ================================================================= -->
+    <!--  CATEGORY 5: EDGE CASES - PAYLOAD TYPE SAFETY                     -->
+    <!--  Tests text/plain, binary, null, and missing field scenarios      -->
+    <!-- ================================================================= -->
+
+    <munit:test name="edge-case-text-plain-payload" doc:description="Verify text/plain payload does not break error handler">
+        <munit:execution>
+            <!-- Simulate error with text/plain response payload -->
+            <set-variable variableName="testError" value="#[{
+                errorType: { namespace: 'HTTP', identifier: 'INTERNAL_SERVER_ERROR' },
+                description: 'Internal server error from downstream',
+                exception: {
+                    errorMessage: {
+                        payload: 'Error: Database connection failed',
+                        attributes: { statusCode: 500, reasonPhrase: 'Internal Server Error' }
+                    }
+                }
+            }]"/>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                previousError="#[import * from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]"
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(500)]"/>
+            <munit-tools:assert-that expression="# [payload.error.code]" is="# [MunitTools::equalTo(500)]"/>
+            <!-- Should complete without throwing -->
+            <munit-tools:assert-that expression="# [payload]" is="# [MunitTools::not(MunitTools::isNullValue())]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="edge-case-null-payload" doc:description="Verify null payload in error does not break handler">
+        <munit:execution>
+            <set-variable variableName="testError" value="#[{
+                errorType: { namespace: 'HTTP', identifier: 'CONNECTIVITY' },
+                description: 'Connection refused',
+                childErrors: [],
+                suppressedErrors: [],
+                exception: {}
+            }]"/>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                previousError="#[import * from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]"
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(503)]"/>
+            <munit-tools:assert-that expression="# [payload.error.code]" is="# [MunitTools::equalTo(503)]"/>
+            <!-- Should handle null/missing fields gracefully -->
+            <munit-tools:assert-that expression="# [payload.error.message]" is="# [MunitTools::not(MunitTools::isNullValue())]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="edge-case-missing-error-message" doc:description="Verify missing errorMessage fields are handled safely">
+        <munit:execution>
+            <set-variable variableName="testError" value="#[{
+                errorType: { namespace: 'MULE', identifier: 'UNKNOWN' },
+                description: 'Unknown error occurred',
+                childErrors: [
+                    { errorType: { namespace: 'HTTP', identifier: 'TIMEOUT' } },
+                    { errorType: { namespace: 'DB', identifier: 'CONNECTIVITY' } }
+                ]
+            }]"/>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                previousError="#[import * from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]"
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <!-- Should not throw even when childErrors lack errorMessage -->
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(500)]"/>
+            <munit-tools:assert-that expression="# [payload.error.code]" is="# [MunitTools::equalTo(500)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="edge-case-empty-child-and-suppressed-errors" doc:description="Verify empty childErrors and suppressedErrors arrays work">
+        <munit:execution>
+            <set-variable variableName="testError" value="#[{
+                errorType: { namespace: 'HTTP', identifier: 'BAD_REQUEST' },
+                description: 'Bad request parameters',
+                childErrors: [],
+                suppressedErrors: []
+            }]"/>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [attributes.httpStatus]" is="# [MunitTools::equalTo(400)]"/>
+            <munit-tools:assert-that expression="# [payload.error.code]" is="# [MunitTools::equalTo(400)]"/>
+            <munit-tools:assert-that expression="# [payload.error.reason]" is="# [MunitTools::equalTo('Bad Request')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="edge-case-nested-composite-and-suppressed" doc:description="Verify deeply nested childErrors + suppressedErrors merge correctly">
+        <munit:execution>
+            <set-variable variableName="testError" value="#[{
+                errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                description: 'Multiple routes failed',
+                childErrors: [
+                    {
+                        errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' },
+                        description: 'Route 1: Resource not found',
+                        errorMessage: { payload: { error: 'User not found' } }
+                    },
+                    {
+                        errorType: { namespace: 'HTTP', identifier: 'TIMEOUT' },
+                        description: 'Route 2: Request timed out',
+                        errorMessage: { payload: { error: 'Gateway timeout' } }
+                    }
+                ],
+                suppressedErrors: [
+                    {
+                        errorType: { namespace: 'HTTP', identifier: 'CONNECTIVITY' },
+                        description: 'Retry attempt 1 failed',
+                        errorMessage: { payload: { error: 'Connection refused' } }
+                    }
+                ]
+            }]"/>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                previousError="#[import * from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]"
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [payload.error]" is="# [MunitTools::not(MunitTools::isNullValue())]"/>
+            <!-- errorLog should contain merged error information -->
+            <munit-tools:assert-that expression="# [attributes.errorLog]" is="# [MunitTools::not(MunitTools::isEmptyString())]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ================================================================= -->
+    <!--  CATEGORY 6: RESPONSE KEY CUSTOMIZATION                           -->
+    <!-- ================================================================= -->
+
+    <munit:test name="test-custom-response-key" doc:description="Verify custom response key name works">
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[{ errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' }, description: 'Not found' }]"
+                responseKey="errorDetails"
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that expression="# [payload.errorDetails.code]" is="# [MunitTools::equalTo(404)]"/>
+            <!-- Should use custom key, not default 'error' -->
+            <munit-tools:assert-that expression="# [payload.error]" is="# [MunitTools::isNullValue()]"/>
+        </munit:validation>
+    </munit:test>
+
+    <munit:test name="test-empty-response-key-root-payload" doc:description="Verify empty response key puts error at root">
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[{ errorType: { namespace: 'HTTP', identifier: 'BAD_REQUEST' }, description: 'Bad request' }]"
+                responseKey=""
+                customErrors="#[{}]"/>
+        </munit:execution>
+        <munit:validation>
+            <!-- Payload should be the error object directly, not wrapped -->
+            <munit-tools:assert-that expression="# [payload.code]" is="# [MunitTools::equalTo(400)]"/>
+            <munit-tools:assert-that expression="# [payload.reason]" is="# [MunitTools::equalTo('Bad Request')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ================================================================= -->
+    <!--  HELPER FLOW                                                      -->
+    <!-- ================================================================= -->
+
+    <flow name="run-process-error-with-raised-error">
+        <try>
+            <raise-error type="#[vars.errorType]" description="#[vars.description]"/>
+            <error-handler>
+                <on-error-continue>
+                    <module-error-handler-plugin:process-error
+                        doc:name="Process Error"
+                        customErrors="#[{}]"/>
+                </on-error-continue>
+            </error-handler>
+        </try>
+    </flow>
+
+</mule>
