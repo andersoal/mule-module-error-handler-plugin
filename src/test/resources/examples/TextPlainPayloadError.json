@@ -1,0 +1,22 @@
+{
+  "_description": "Simulates HTTP error with text/plain payload from downstream API (e.g., load balancer error page)",
+  "errorType": {
+    "namespace": "HTTP",
+    "identifier": "INTERNAL_SERVER_ERROR"
+  },
+  "description": "Internal Server Error from downstream API",
+  "childErrors": [],
+  "suppressedErrors": [],
+  "exception": {
+    "errorMessage": {
+      "payload": "Error: Unable to connect to database server at 192.168.1.100:5432",
+      "attributes": {
+        "statusCode": 500,
+        "reasonPhrase": "Internal Server Error",
+        "headers": {
+          "content-type": "text/plain"
+        }
+      }
+    }
+  }
+}

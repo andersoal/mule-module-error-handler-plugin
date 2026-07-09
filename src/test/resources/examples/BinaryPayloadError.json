@@ -1,0 +1,22 @@
+{
+  "_description": "Simulates HTTP error with binary payload (e.g., PDF error report from downstream API)",
+  "errorType": {
+    "namespace": "HTTP",
+    "identifier": "UNSUPPORTED_MEDIA_TYPE"
+  },
+  "description": "The API returned an unsupported media type",
+  "childErrors": [],
+  "suppressedErrors": [],
+  "exception": {
+    "errorMessage": {
+      "payload": null,
+      "attributes": {
+        "statusCode": 415,
+        "reasonPhrase": "Unsupported Media Type",
+        "headers": {
+          "content-type": "application/octet-stream"
+        }
+      }
+    }
+  }
+}

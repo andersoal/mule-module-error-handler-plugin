@@ -1,0 +1,86 @@
+{
+  "_description": "Simulates complex error with mixed payload types across childErrors (JSON, text, null, missing)",
+  "errorType": {
+    "namespace": "MULE",
+    "identifier": "COMPOSITE_ROUTING"
+  },
+  "description": "Multiple failures with mixed response types",
+  "childErrors": [
+    {
+      "errorType": {
+        "namespace": "HTTP",
+        "identifier": "INTERNAL_SERVER_ERROR"
+      },
+      "description": "System API returned JSON error",
+      "errorMessage": {
+        "payload": {
+          "error": "Database connection failed",
+          "code": "DB_001"
+        },
+        "attributes": {
+          "statusCode": 500,
+          "reasonPhrase": "Internal Server Error"
+        }
+      }
+    },
+    {
+      "errorType": {
+        "namespace": "HTTP",
+        "identifier": "BAD_GATEWAY"
+      },
+      "description": "Load balancer returned text error",
+      "errorMessage": {
+        "payload": "502 Bad Gateway: The server is temporarily unavailable",
+        "attributes": {
+          "statusCode": 502,
+          "reasonPhrase": "Bad Gateway",
+          "headers": {
+            "content-type": "text/html"
+          }
+        }
+      }
+    },
+    {
+      "errorType": {
+        "namespace": "HTTP",
+        "identifier": "CONNECTIVITY"
+      },
+      "description": "Service unreachable - no response body",
+      "errorMessage": {
+        "payload": null,
+        "attributes": {}
+      }
+    },
+    {
+      "errorType": {
+        "namespace": "DB",
+        "identifier": "QUERY_EXECUTION"
+      },
+      "description": "Query failed - missing errorMessage structure"
+    }
+  ],
+  "suppressedErrors": [
+    {
+      "errorType": {
+        "namespace": "HTTP",
+        "identifier": "CONNECTIVITY"
+      },
+      "description": "Retry attempt 1 failed",
+      "errorMessage": {
+        "payload": "Connection refused: connect",
+        "attributes": {}
+      }
+    },
+    {
+      "errorType": {
+        "namespace": "HTTP",
+        "identifier": "TIMEOUT"
+      },
+      "description": "Retry attempt 2 timed out",
+      "errorMessage": {
+        "payload": null,
+        "attributes": {}
+      }
+    }
+  ]
+}
