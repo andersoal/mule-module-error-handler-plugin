@@ -1,0 +1,103 @@
+{
+  "_description": "Simulates deeply nested error: Parallel-Foreach > Scatter-Gather > Validation:ALL (4 levels deep)",
+  "errorType": {
+    "namespace": "MULE",
+    "identifier": "COMPOSITE_ROUTING"
+  },
+  "description": "Complex nested routing failure",
+  "childErrors": [
+    {
+      "errorType": {
+        "namespace": "MULE",
+        "identifier": "COMPOSITE_ROUTING"
+      },
+      "description": "Scatter-Gather route 1 failed",
+      "childErrors": [
+        {
+          "errorType": {
+            "namespace": "VALIDATION",
+            "identifier": "INVALID_PARAMETER"
+          },
+          "description": "Validation failed for field 'email'",
+          "errorMessage": {
+            "payload": {
+              "field": "email",
+              "error": "Invalid email format"
+            },
+            "attributes": {}
+          }
+        },
+        {
+          "errorType": {
+            "namespace": "VALIDATION",
+            "identifier": "INVALID_PARAMETER"
+          },
+          "description": "Validation failed for field 'phone'",
+          "errorMessage": {
+            "payload": {
+              "field": "phone",
+              "error": "Invalid phone number"
+            },
+            "attributes": {}
+          }
+        },
+        {
+          "errorType": {
+            "namespace": "MULE",
+            "identifier": "COMPOSITE_ROUTING"
+          },
+          "description": "Nested Scatter-Gather failed",
+          "childErrors": [
+            {
+              "errorType": {
+                "namespace": "HTTP",
+                "identifier": "NOT_FOUND"
+              },
+              "description": "Deep nested: Resource not found",
+              "errorMessage": {
+                "payload": {
+                  "error": "Customer profile not found",
+                  "customerId": "CUST-99999"
+                },
+                "attributes": {
+                  "statusCode": 404,
+                  "reasonPhrase": "Not Found"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "suppressedErrors": []
+    },
+    {
+      "errorType": {
+        "namespace": "HTTP",
+        "identifier": "TIMEOUT"
+      },
+      "description": "Scatter-Gather route 2 timed out",
+      "errorMessage": {
+        "payload": {
+          "error": "Payment gateway timeout"
+        },
+        "attributes": {
+          "statusCode": 408,
+          "reasonPhrase": "Request Timeout"
+        }
+      }
+    }
+  ],
+  "suppressedErrors": [
+    {
+      "errorType": {
+        "namespace": "HTTP",
+        "identifier": "CONNECTIVITY"
+      },
+      "description": "Until-Successful attempt 1 failed",
+      "errorMessage": {
+        "payload": "Connection timeout after 5000ms",
+        "attributes": {}
+      }
+    }
+  ]
+}
