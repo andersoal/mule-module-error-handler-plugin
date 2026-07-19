@@ -74,7 +74,7 @@
 
     <munit:test
         name="to-string-handles-all-types"
-        description="toString converts Strings, Numbers, Binary, and complex values; empty input returns the provided default.">
+        description="toString converts Strings, Numbers, Binary, and complex values (as JSON so live Java beans keep their content); empty input returns the provided default.">
         <munit:validation>
             <munit-tools:assert-equals
                 actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- toString('plain')]"
@@ -86,9 +86,10 @@
             <munit-tools:assert-equals
                 actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- toString('binary content' as Binary)]"
                 expected="#['binary content']" />
+            <!-- Complex values are written as JSON, not the Java form (which loses bean content) -->
             <munit-tools:assert-that
                 expression="#[%dw 2.0 import * from module_error_handler_plugin::common --- toString({a: 1})]"
-                is="#[MunitTools::containsString('a=1')]" />
+                is="#[MunitTools::containsString('&quot;a&quot;: 1')]" />
             <munit-tools:assert-equals
                 actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- toString(null, 'fallback')]"
                 expected="#['fallback']" />

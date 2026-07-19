@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:http="http://www.mulesoft.org/schema/mule/http"
+    xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+    xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+    xmlns:module-error-handler-plugin="http://www.mulesoft.org/schema/mule/module-error-handler-plugin"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/module-error-handler-plugin http://www.mulesoft.org/schema/mule/module-error-handler-plugin/current/mule-module-error-handler-plugin.xsd">
+
+    <munit:config name="payload-shapes-test-suite.xml" />
+
+    <!--
+        Payload-axis tests and hot intersections (wayfinder tickets 004/007): how the module
+        handles the reply-body shapes an errorMessage.payload can take — JSON, HTML, plain text,
+        Binary, XML, null/absent, Java objects — for standard and composite errors.
+        Grows under ticket 007; seeded with the downstream-422 capture (ticket 011).
+    -->
+
+    <http:listener-config name="payloadListenerConfig">
+        <http:listener-connection host="localhost" port="${payload.listener.port}" />
+    </http:listener-config>
+
+    <http:request-config name="payloadRequestConfig">
+        <http:request-connection host="localhost" port="${payload.listener.port}" />
+    </http:request-config>
+
+    <flow name="payload-422-endpoint-flow">
+        <http:listener config-ref="payloadListenerConfig" path="/unprocessable">
+            <http:response statusCode="422" reasonPhrase="Unprocessable Entity" />
+        </http:listener>
+        <set-payload value='{"error": "row 3 failed business validation"}' mimeType="application/json" />
+    </flow>
+
+    <munit:test
+        name="downstream-422-surfaces-as-mule-unknown"
+        description="A real endpoint replying HTTP 422 (no dedicated HTTP: error type) surfaces as MULE:UNKNOWN with the status only in errorMessage.attributes (wayfinder ticket 011).">
+        <munit:enable-flow-sources>
+            <munit:enable-flow-source value="payload-422-endpoint-flow" />
+        </munit:enable-flow-sources>
+        <munit:execution>
+            <try>
+                <http:request config-ref="payloadRequestConfig" method="POST" path="/unprocessable" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable
+                            variableName="capturedErrorType"
+                            value="#[(error.errorType.namespace default '?') ++ ':' ++ (error.errorType.identifier default '?')]" />
+                        <set-variable
+                            variableName="capturedStatusCode"
+                            value="#[error.errorMessage.attributes.statusCode default -1]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[vars.capturedErrorType]"
+                is="#[MunitTools::equalTo('MULE:UNKNOWN')]" />
+            <munit-tools:assert-that
+                expression="#[vars.capturedStatusCode]"
+                is="#[MunitTools::equalTo(422)]" />
+        </munit:validation>
+    </munit:test>
+
+</mule>

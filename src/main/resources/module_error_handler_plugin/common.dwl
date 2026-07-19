@@ -196,7 +196,10 @@ fun resolveStatusCodePassthrough(muleError, defaultErrors, customErrors = {}) = 
  * Converts a value to a String representation.
  * Binary is read as text; if the bytes are not readable as text, it falls back to Base64.
  * Primitives are directly converted to Strings.
- * Complex objects, like Objects and Arrays, are converted to the String presentation of their Java form.
+ * Complex values, like Objects, Arrays, and Java beans, are written as JSON; the String
+ * presentation of their Java form is the last resort.  JSON is preferred because the Java
+ * form of a bean (e.g. the Validation module's ValidationResult inside a live composite
+ * error) is just ClassName@hash, which loses the message content.
  *
  * @p value to convert.
  * @p def is the default value if the provided value is empty.
@@ -209,7 +212,7 @@ fun toString(value, def="") = do {
         case s is String -> s
         case n is Number -> n as String
         case b is Binary -> evalOrElse(() -> read(b, "text/plain") as String, toBase64(b))
-        else             -> write(safeValue, "application/java")
+        else             -> evalOrElse(() -> write(safeValue, "application/json") as String, write(safeValue, "application/java"))
     }
 }
 

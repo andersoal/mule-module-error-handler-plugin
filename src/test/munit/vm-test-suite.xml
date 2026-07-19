@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+    xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+    xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+    xmlns:module-error-handler-plugin="http://www.mulesoft.org/schema/mule/module-error-handler-plugin"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/module-error-handler-plugin http://www.mulesoft.org/schema/mule/module-error-handler-plugin/current/mule-module-error-handler-plugin.xsd">
+
+    <munit:config name="vm-test-suite.xml" />
+
+    <!--
+        Real-flow tests for VM publish-consume error propagation (wayfinder tickets 006/009).
+        On 4.6.1 the consumer flow's error surfaces synchronously as VM:PUBLISH_CONSUMER_FLOW_ERROR
+        with EMPTY childErrors/suppressedErrors — the inner error survives only as description text.
+    -->
+
+    <vm:config name="vmSuiteConfig">
+        <vm:queues>
+            <vm:queue queueName="vmSuiteQueue" />
+        </vm:queues>
+    </vm:config>
+
+    <flow name="vm-suite-consumer-helper-flow">
+        <vm:listener config-ref="vmSuiteConfig" queueName="vmSuiteQueue" />
+        <raise-error type="APP:BOOM" description="consumer flow failed" />
+    </flow>
+
+    <flow name="vm-suite-publish-consume-helper-flow">
+        <vm:publish-consume config-ref="vmSuiteConfig" queueName="vmSuiteQueue" />
+    </flow>
+
+    <munit:test
+        name="vm-publish-consume-error-shape-on-runtime"
+        description="A failing vm:publish-consume consumer surfaces as VM:PUBLISH_CONSUMER_FLOW_ERROR with NO nested errors on 4.6.1; the inner error is description text only (wayfinder ticket 009).">
+        <munit:enable-flow-sources>
+            <munit:enable-flow-source value="vm-suite-consumer-helper-flow" />
+        </munit:enable-flow-sources>
+        <munit:execution>
+            <try>
+                <flow-ref name="vm-suite-publish-consume-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable
+                            variableName="capturedErrorType"
+                            value="#[(error.errorType.namespace default '?') ++ ':' ++ (error.errorType.identifier default '?')]" />
+                        <set-variable
+                            variableName="capturedNestedCount"
+                            value="#[sizeOf(error.childErrors default []) + sizeOf(error.suppressedErrors default [])]" />
+                        <set-variable
+                            variableName="capturedDescription"
+                            value="#[error.description default '']" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[vars.capturedErrorType]"
+                is="#[MunitTools::equalTo('VM:PUBLISH_CONSUMER_FLOW_ERROR')]" />
+            <munit-tools:assert-that
+                expression="#[vars.capturedNestedCount]"
+                is="#[MunitTools::equalTo(0)]" />
+            <munit-tools:assert-that
+                expression="#[vars.capturedDescription]"
+                is="#[MunitTools::containsString('consumer flow failed')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="vm-publish-consume-unwrap-falls-back-to-wrapper-mapping"
+        description="With resolveNestedErrors=true the VM wrapper has no leaves on 4.6.1, so the decided fallback applies: the wrapper's own resolution (here a custom entry).">
+        <munit:enable-flow-sources>
+            <munit:enable-flow-source value="vm-suite-consumer-helper-flow" />
+        </munit:enable-flow-sources>
+        <munit:execution>
+            <try>
+                <flow-ref name="vm-suite-publish-consume-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable variableName="testError" value="#[error]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true">
+                <module-error-handler-plugin:custom-errors><![CDATA[#[{
+                    "VM:PUBLISH_CONSUMER_FLOW_ERROR": {
+                        code: 502,
+                        reason: "Consumer Flow Failure",
+                        message: "The asynchronous consumer failed"
+                    }
+                }]]]></module-error-handler-plugin:custom-errors>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(502)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Consumer Flow Failure')]" />
+        </munit:validation>
+    </munit:test>
+
+</mule>

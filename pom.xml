@@ -109,6 +109,14 @@
                 <groupId>com.mulesoft.munit</groupId>
                 <artifactId>munit-extensions-maven-plugin</artifactId>
                 <version>${munit.extensions.maven.plugin.version}</version>
+                <configuration>
+                    <!-- Free ports allocated per run: dead.endpoint.port is never bound (connection
+                         refused on purpose); payload.listener.port hosts the test HTTP listener. -->
+                    <dynamicPorts>
+                        <dynamicPort>dead.endpoint.port</dynamicPort>
+                        <dynamicPort>payload.listener.port</dynamicPort>
+                    </dynamicPorts>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
@@ -135,6 +143,12 @@
                         <groupId>org.mule.connectors</groupId>
                         <artifactId>mule-vm-connector</artifactId>
                         <version>2.0.1</version>
+                        <classifier>mule-plugin</classifier>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.mule.modules</groupId>
+                        <artifactId>mule-validation-module</artifactId>
+                        <version>2.0.7</version>
                         <classifier>mule-plugin</classifier>
                     </dependency>
                 </dependencies>

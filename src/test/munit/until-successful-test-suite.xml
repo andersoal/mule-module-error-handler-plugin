@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:http="http://www.mulesoft.org/schema/mule/http"
+    xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+    xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+    xmlns:module-error-handler-plugin="http://www.mulesoft.org/schema/mule/module-error-handler-plugin"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/module-error-handler-plugin http://www.mulesoft.org/schema/mule/module-error-handler-plugin/current/mule-module-error-handler-plugin.xsd">
+
+    <munit:config name="until-successful-test-suite.xml" />
+
+    <!--
+        Real-flow tests for Until-Successful exhaustion (wayfinder tickets 006/009).
+        A genuine HTTP:CONNECTIVITY failure exhausts the retries, producing MULE:RETRY_EXHAUSTED
+        with the inner error in suppressedErrors.  Verified 4.6.1 behavior (ticket 009):
+        exactly ONE suppressed entry regardless of attempt count, and write(error, ...) throws on
+        this error shape, so probes stay field-level.
+    -->
+
+    <http:request-config name="usDeadEndpointConfig">
+        <http:request-connection host="localhost" port="${dead.endpoint.port}" />
+    </http:request-config>
+
+    <flow name="us-exhausted-helper-flow">
+        <until-successful maxRetries="2" millisBetweenRetries="100">
+            <http:request config-ref="usDeadEndpointConfig" method="GET" path="/nope" />
+        </until-successful>
+    </flow>
+
+    <munit:test
+        name="until-successful-suppressed-errors-shape-on-runtime"
+        description="Exhausting an Until-Successful around a genuine HTTP:CONNECTIVITY failure yields MULE:RETRY_EXHAUSTED carrying exactly one suppressed HTTP:CONNECTIVITY entry (4.6.1 behavior, wayfinder ticket 009).">
+        <munit:execution>
+            <try>
+                <flow-ref name="us-exhausted-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable
+                            variableName="capturedErrorType"
+                            value="#[(error.errorType.namespace default '?') ++ ':' ++ (error.errorType.identifier default '?')]" />
+                        <set-variable
+                            variableName="capturedSuppressedTypes"
+                            value="#[(error.suppressedErrors default []) map ((e) -> (e.errorType.namespace default '?') ++ ':' ++ (e.errorType.identifier default '?'))]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[vars.capturedErrorType]"
+                is="#[MunitTools::equalTo('MULE:RETRY_EXHAUSTED')]" />
+            <munit-tools:assert-that
+                expression="#[vars.capturedSuppressedTypes]"
+                is="#[MunitTools::equalTo(['HTTP:CONNECTIVITY'])]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="until-successful-unwrap-resolves-suppressed-leaf-to-503"
+        description="With resolveNestedErrors=true a real MULE:RETRY_EXHAUSTED resolves via its suppressed HTTP:CONNECTIVITY leaf (503 Service Unavailable).">
+        <munit:execution>
+            <try>
+                <flow-ref name="us-exhausted-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable variableName="testError" value="#[error]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(503)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Service Unavailable')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="until-successful-default-resolution-is-unknown-500"
+        description="Without resolveNestedErrors a real MULE:RETRY_EXHAUSTED has no default mapping and returns UNKNOWN 500 — backward compatibility.">
+        <munit:execution>
+            <try>
+                <flow-ref name="us-exhausted-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable variableName="testError" value="#[error]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+</mule>

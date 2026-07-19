@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+    xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+    xmlns:module-error-handler-plugin="http://www.mulesoft.org/schema/mule/module-error-handler-plugin"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/module-error-handler-plugin http://www.mulesoft.org/schema/mule/module-error-handler-plugin/current/mule-module-error-handler-plugin.xsd">
+
+    <munit:config name="async-foreach-test-suite.xml" />
+
+    <!--
+        Real-flow tests for plain propagation paths (wayfinder ticket 006):
+        - Foreach propagates the failing item's error unwrapped (no composite).
+        - Async never propagates to the caller; observed via a munit-tools queue.
+    -->
+
+    <flow name="foreach-failing-item-helper-flow">
+        <foreach collection="#[[1, 2]]">
+            <choice>
+                <when expression="#[payload == 2]">
+                    <raise-error type="APP:ITEM_FAILURE" description="Item 2 processing failed" />
+                </when>
+                <otherwise>
+                    <logger level="DEBUG" message="#[payload]" />
+                </otherwise>
+            </choice>
+        </foreach>
+    </flow>
+
+    <flow name="async-failure-helper-flow">
+        <async>
+            <try>
+                <raise-error type="APP:ASYNC_BOOM" description="async processing failed" />
+                <error-handler>
+                    <on-error-continue>
+                        <munit-tools:queue queueName="asyncErrorQueue">
+                            <munit-tools:value>#[error.description default 'unknown']</munit-tools:value>
+                        </munit-tools:queue>
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </async>
+        <set-payload value="caller continued" />
+    </flow>
+
+    <munit:test
+        name="foreach-propagates-plain-item-error"
+        description="A failure inside a plain Foreach propagates the item's error unwrapped (APP:ITEM_FAILURE, no composite wrapper); process-error resolves it as UNKNOWN 500 with the item's description.">
+        <munit:execution>
+            <try>
+                <flow-ref name="foreach-failing-item-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable variableName="testError" value="#[error]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[%dw 2.0 import getErrorTypeAsString from module_error_handler_plugin::common --- getErrorTypeAsString(vars.testError.errorType)]"
+                is="#[MunitTools::equalTo('APP:ITEM_FAILURE')]" />
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo('Item 2 processing failed')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="async-error-never-reaches-the-caller"
+        description="An error raised inside an Async scope does not propagate to the caller — the flow completes normally and the error is only observable inside the scope (characterization).">
+        <munit:execution>
+            <flow-ref name="async-failure-helper-flow" />
+            <munit-tools:dequeue queueName="asyncErrorQueue" timeout="10000" timeoutUnit="MILLISECONDS" />
+            <set-variable variableName="asyncErrorDescription" value="#[payload]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[vars.asyncErrorDescription]"
+                is="#[MunitTools::equalTo('async processing failed')]" />
+        </munit:validation>
+    </munit:test>
+
+</mule>
