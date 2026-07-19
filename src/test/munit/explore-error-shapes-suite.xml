@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:http="http://www.mulesoft.org/schema/mule/http"
+    xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+    xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+    xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+
+    <munit:config name="explore-error-shapes-suite.xml" />
+
+    <!--
+        EXPLORATORY suite for wayfinder ticket 009: captures the real runtime shape of
+        error.suppressedErrors for Until-Successful and VM publish-consume on Mule ${app.runtime}.
+        The probe JSON is logged at ERROR level and harvested from the build output.
+    -->
+
+    <http:request-config name="deadEndpointConfig">
+        <http:request-connection host="localhost" port="59999" />
+    </http:request-config>
+
+    <http:listener-config name="exploreListenerConfig">
+        <http:listener-connection host="localhost" port="59891" />
+    </http:listener-config>
+
+    <http:request-config name="exploreRequestConfig">
+        <http:request-connection host="localhost" port="59891" />
+    </http:request-config>
+
+    <flow name="http-422-endpoint-flow">
+        <http:listener config-ref="exploreListenerConfig" path="/unprocessable">
+            <http:response statusCode="422" reasonPhrase="Unprocessable Entity" />
+        </http:listener>
+        <set-payload value='{"error": "row 3 failed business validation"}' mimeType="application/json" />
+    </flow>
+
+    <vm:config name="vmTestConfig">
+        <vm:queues>
+            <vm:queue queueName="exploreQueue" />
+        </vm:queues>
+    </vm:config>
+
+    <flow name="until-successful-helper-flow">
+        <until-successful maxRetries="2" millisBetweenRetries="100">
+            <http:request config-ref="deadEndpointConfig" method="GET" path="/nope" />
+        </until-successful>
+    </flow>
+
+    <flow name="vm-consumer-helper-flow">
+        <vm:listener config-ref="vmTestConfig" queueName="exploreQueue" />
+        <raise-error type="APP:BOOM" description="consumer flow failed" />
+    </flow>
+
+    <flow name="vm-publish-consume-helper-flow">
+        <vm:publish-consume config-ref="vmTestConfig" queueName="exploreQueue" />
+    </flow>
+
+    <munit:test
+        name="capture-until-successful-suppressed-errors-shape"
+        description="Exhausts an Until-Successful around a genuine HTTP:CONNECTIVITY failure and logs the resulting error shape.">
+        <munit:execution>
+            <try>
+                <flow-ref name="until-successful-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <logger level="ERROR" message="#[%dw 2.0
+output application/json
+import try from dw::Runtime
+fun safe(f) = do { var a = try(f) --- if (a.success) a.result else ('PROBE_FAILED: ' ++ (a.error.message default '?')) }
+---
+{
+  capture: 'CAPTURE_UNTIL_SUCCESSFUL',
+  errorTypeString: (error.errorType.namespace default '?') ++ ':' ++ (error.errorType.identifier default '?'),
+  parentErrorType: safe(() -> (error.errorType.parentErrorType.namespace default '?') ++ ':' ++ (error.errorType.parentErrorType.identifier default '?')),
+  description: error.description,
+  childErrorsCount: safe(() -> sizeOf(error.childErrors)),
+  suppressedCount: safe(() -> sizeOf(error.suppressedErrors)),
+  suppressedTypes: safe(() -> error.suppressedErrors map ((e) -> (e.errorType.namespace default '?') ++ ':' ++ (e.errorType.identifier default '?'))),
+  full: safe(() -> write(error, 'application/json'))
+}]" />
+                        <set-variable
+                            variableName="capturedErrorType"
+                            value="#[(error.errorType.namespace default '?') ++ ':' ++ (error.errorType.identifier default '?')]" />
+                        <set-variable
+                            variableName="capturedSuppressedTypes"
+                            value="#[(error.suppressedErrors default []) map ((e) -> (e.errorType.namespace default '?') ++ ':' ++ (e.errorType.identifier default '?'))]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[vars.capturedErrorType]"
+                is="#[MunitTools::equalTo('MULE:RETRY_EXHAUSTED')]" />
+            <!-- 4.6.1 keeps exactly one suppressed inner error, not one per attempt (wayfinder ticket 009) -->
+            <munit-tools:assert-that
+                expression="#[vars.capturedSuppressedTypes]"
+                is="#[MunitTools::equalTo(['HTTP:CONNECTIVITY'])]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="capture-downstream-422-error-shape"
+        description="Calls an endpoint that replies HTTP 422 (no dedicated HTTP: error type) and logs the error the requester raises.">
+        <munit:enable-flow-sources>
+            <munit:enable-flow-source value="http-422-endpoint-flow" />
+        </munit:enable-flow-sources>
+        <munit:execution>
+            <try>
+                <http:request config-ref="exploreRequestConfig" method="POST" path="/unprocessable" />
+                <error-handler>
+                    <on-error-continue>
+                        <logger level="ERROR" message="#[%dw 2.0
+output application/json
+import try from dw::Runtime
+fun safe(f) = do { var a = try(f) --- if (a.success) a.result else ('PROBE_FAILED: ' ++ (a.error.message default '?')) }
+---
+{
+  capture: 'CAPTURE_DOWNSTREAM_422',
+  errorTypeString: (error.errorType.namespace default '?') ++ ':' ++ (error.errorType.identifier default '?'),
+  parentErrorType: safe(() -> (error.errorType.parentErrorType.namespace default '?') ++ ':' ++ (error.errorType.parentErrorType.identifier default '?')),
+  description: error.description,
+  statusCode: safe(() -> error.errorMessage.attributes.statusCode),
+  reasonPhrase: safe(() -> error.errorMessage.attributes.reasonPhrase),
+  payload: safe(() -> write(error.errorMessage.payload, 'application/json')),
+  full: safe(() -> write(error, 'application/json'))
+}]" />
+                        <set-variable
+                            variableName="capturedErrorType"
+                            value="#[(error.errorType.namespace default '?') ++ ':' ++ (error.errorType.identifier default '?')]" />
+                        <set-variable
+                            variableName="capturedStatusCode"
+                            value="#[error.errorMessage.attributes.statusCode default -1]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </munit:execution>
+        <munit:validation>
+            <!-- 422 has no dedicated HTTP: error type; it surfaces as MULE:UNKNOWN (wayfinder ticket 011) -->
+            <munit-tools:assert-that
+                expression="#[vars.capturedErrorType]"
+                is="#[MunitTools::equalTo('MULE:UNKNOWN')]" />
+            <munit-tools:assert-that
+                expression="#[vars.capturedStatusCode]"
+                is="#[MunitTools::equalTo(422)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="capture-vm-publish-consume-error-shape"
+        description="Fails a vm:publish-consume consumer flow and logs the resulting error shape.">
+        <munit:enable-flow-sources>
+            <munit:enable-flow-source value="vm-consumer-helper-flow" />
+        </munit:enable-flow-sources>
+        <munit:execution>
+            <try>
+                <flow-ref name="vm-publish-consume-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <logger level="ERROR" message="#[%dw 2.0
+output application/json
+import try from dw::Runtime
+fun safe(f) = do { var a = try(f) --- if (a.success) a.result else ('PROBE_FAILED: ' ++ (a.error.message default '?')) }
+---
+{
+  capture: 'CAPTURE_VM_PUBLISH_CONSUME',
+  errorTypeString: (error.errorType.namespace default '?') ++ ':' ++ (error.errorType.identifier default '?'),
+  parentErrorType: safe(() -> (error.errorType.parentErrorType.namespace default '?') ++ ':' ++ (error.errorType.parentErrorType.identifier default '?')),
+  description: error.description,
+  childErrorsCount: safe(() -> sizeOf(error.childErrors)),
+  suppressedCount: safe(() -> sizeOf(error.suppressedErrors)),
+  suppressedTypes: safe(() -> error.suppressedErrors map ((e) -> (e.errorType.namespace default '?') ++ ':' ++ (e.errorType.identifier default '?'))),
+  full: safe(() -> write(error, 'application/json'))
+}]" />
+                        <set-variable
+                            variableName="capturedErrorType"
+                            value="#[(error.errorType.namespace default '?') ++ ':' ++ (error.errorType.identifier default '?')]" />
+                        <set-variable
+                            variableName="capturedNestedCount"
+                            value="#[sizeOf(error.childErrors default []) + sizeOf(error.suppressedErrors default [])]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[vars.capturedErrorType]"
+                is="#[MunitTools::equalTo('VM:PUBLISH_CONSUMER_FLOW_ERROR')]" />
+            <!-- On 4.6.1 the VM wrapper carries NO nested errors; the inner error is description text only (wayfinder ticket 009) -->
+            <munit-tools:assert-that
+                expression="#[vars.capturedNestedCount]"
+                is="#[MunitTools::equalTo(0)]" />
+        </munit:validation>
+    </munit:test>
+
+</mule>

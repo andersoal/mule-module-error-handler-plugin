@@ -37,8 +37,11 @@ function buildProject {
 	# Generate POM
 	execute "sed 's/ORG_ID_TOKEN/${GROUP_ID}/g' pom.xml > pom-generated.xml"
 
-	 # Construct Maven command
+	 # Construct Maven command.  Deploys need the release profile for Exchange publication.
     MAVEN_CMD="mvn -f pom-generated.xml clean $1"
+    if [ "$1" == "deploy" ]; then
+        MAVEN_CMD+=" -Prelease"
+    fi
     if [ -n "$REPO_ID" ]; then
         MAVEN_CMD+=" -Drepo.id=$REPO_ID"
     fi

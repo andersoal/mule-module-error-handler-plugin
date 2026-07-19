@@ -1,0 +1,88 @@
+{
+  "exception": {
+    "localizedMessage": "HTTP POST on resource 'http://localhost:59891/unprocessable' failed with status code 422.",
+    "errorMessage": {
+      "inboundAttachmentNames": [],
+      "exceptionPayload": null,
+      "inboundPropertyNames": [],
+      "outboundAttachmentNames": [],
+      "payload": {
+        "error": "row 3 failed business validation"
+      },
+      "outboundPropertyNames": [],
+      "attributes": {
+        "headers": {
+          "content-type": "application/json",
+          "content-length": "45",
+          "date": "Sun, 19 Jul 2026 18:23:29 GMT"
+        },
+        "reasonPhrase": "Unprocessable Entity",
+        "statusCode": 422
+      }
+    },
+    "cause": null,
+    "message": "HTTP POST on resource 'http://localhost:59891/unprocessable' failed with status code 422.",
+    "suppressed": [],
+    "stackTrace": []
+  },
+  "dslSource": null,
+  "suppressedErrors": [],
+  "childErrors": [],
+  "errorType": {
+    "identifier": "UNKNOWN",
+    "parentErrorType": {
+      "identifier": "ANY",
+      "parentErrorType": null,
+      "namespace": "MULE"
+    },
+    "namespace": "MULE"
+  },
+  "errorMessage": {
+    "inboundAttachmentNames": [],
+    "exceptionPayload": null,
+    "inboundPropertyNames": [],
+    "outboundAttachmentNames": [],
+    "payload": {
+      "error": "row 3 failed business validation"
+    },
+    "outboundPropertyNames": [],
+    "attributes": {
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "45",
+        "date": "Sun, 19 Jul 2026 18:23:29 GMT"
+      },
+      "reasonPhrase": "Unprocessable Entity",
+      "statusCode": 422
+    }
+  },
+  "cause": {
+    "localizedMessage": "HTTP POST on resource 'http://localhost:59891/unprocessable' failed with status code 422.",
+    "errorMessage": {
+      "inboundAttachmentNames": [],
+      "exceptionPayload": null,
+      "inboundPropertyNames": [],
+      "outboundAttachmentNames": [],
+      "payload": {
+        "error": "row 3 failed business validation"
+      },
+      "outboundPropertyNames": [],
+      "attributes": {
+        "headers": {
+          "content-type": "application/json",
+          "content-length": "45",
+          "date": "Sun, 19 Jul 2026 18:23:29 GMT"
+        },
+        "reasonPhrase": "Unprocessable Entity",
+        "statusCode": 422
+      }
+    },
+    "cause": null,
+    "message": "HTTP POST on resource 'http://localhost:59891/unprocessable' failed with status code 422.",
+    "suppressed": [],
+    "stackTrace": []
+  },
+  "description": "HTTP POST on resource 'http://localhost:59891/unprocessable' failed with status code 422.",
+  "detailedDescription": "HTTP POST on resource 'http://localhost:59891/unprocessable' failed with status code 422.",
+  "failingComponent": null
+}
