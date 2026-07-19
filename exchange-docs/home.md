@@ -93,6 +93,7 @@ This module provides all the features below.  It provides the main features of p
 - Log error message, separate from API response payload, that stringifies and aggregates all error messages.  This is available in the error handler flow for printing in the error logger.  This feature is useful since you only want to return a single error to the caller but would like to log all errors for troubleshooting.  This aggregates current error message, previous error message, and the error object's description field.
 - Maps app-raised errors with the `UNPROCESSABLE_ENTITY` identifier (any namespace, e.g. `APP:UNPROCESSABLE_ENTITY`) to _422 Unprocessable Entity_ by default.
 - Optionally resolves composite/wrapper errors (Scatter-Gather, Parallel For-Each, Until-Successful, VM publish-consume, Validation All) to the response of the standard error nested inside them via the _Resolve Nested Errors_ parameter.
+- Optionally propagates the downstream response's status code for statuses without a dedicated Mule error type (e.g. 422) via the _Propagate Downstream Status Code_ parameter.
 
 ### Error Messages Used by Module
 
@@ -170,7 +171,16 @@ Set the _Resolve Nested Errors_ parameter (`resolveNestedErrors`, Advanced tab, 
 
 The default definitions include a `*:UNPROCESSABLE_ENTITY` wildcard, so raising an error whose identifier is `UNPROCESSABLE_ENTITY` (e.g. `<raise-error type="APP:UNPROCESSABLE_ENTITY" .../>`) returns _422 Unprocessable Entity_ with a fixed message.  Override it via _Custom Errors_ if different text is needed.
 
-Note: a 422 reply from a downstream API called with the HTTP requester surfaces as `MULE:UNKNOWN` (there is no dedicated `HTTP:` error type for 422), so it cannot be mapped by type.  Handle that case via a `MULE:UNKNOWN` custom-error entry that inspects `error.errorMessage.attributes.statusCode`.
+Note: a 422 reply from a downstream API called with the HTTP requester surfaces as `MULE:UNKNOWN` (there is no dedicated `HTTP:` error type for 422), so it cannot be mapped by type.  Enable _Propagate Downstream Status Code_ (below) to return it faithfully, or handle it via a `MULE:UNKNOWN` custom-error entry that inspects `error.errorMessage.attributes.statusCode`.
+
+#### Propagate Downstream Status Code
+
+Set the _Propagate Downstream Status Code_ parameter (`propagateStatusCode`, Advanced tab, default `false`) to `true` to respond with the downstream API's actual status code when the error type has no mapping of its own:
+
+- Applies when the error would otherwise fall to _500 Internal Server Error_ (the `UNKNOWN` entry) and the error carries a readable `errorMessage.attributes.statusCode` — e.g. downstream replies with statuses that have no dedicated Mule error type, like `422` or `495`.
+- The response uses the downstream status code and reason phrase; the message keeps the default (UNKNOWN) message semantics, and the response body is still available through the _Use Previous Error_ mechanism.
+- An explicit mapping always wins: a custom `MULE:UNKNOWN` entry disables passthrough for unknown errors.
+- Combines with _Resolve Nested Errors_: nested resolution is tried first, then status-code passthrough, then normal resolution.
 
 ## Installation
 

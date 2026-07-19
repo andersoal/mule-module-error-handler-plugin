@@ -253,6 +253,72 @@
     </munit:test>
 
     <munit:test
+        name="resolve-status-code-passthrough-rules"
+        description="resolveStatusCodePassthrough (wayfinder ticket 014): unmapped error types with a readable downstream statusCode resolve to that status and reason phrase, keeping the UNKNOWN entry's message; explicit mappings (including custom MULE:UNKNOWN) and missing/non-numeric status codes return null.">
+        <munit:behavior>
+            <set-variable
+                variableName="errorList"
+                value="#[{
+                    'UNKNOWN'       : { code: 500, reason: 'Internal Server Error', message: 'default' },
+                    'HTTP:NOT_FOUND': { code: 404, reason: 'Not Found', message: 'nf' }
+                }]" />
+            <set-variable
+                variableName="unknown422"
+                value="#[{
+                    errorType: { namespace: 'MULE', identifier: 'UNKNOWN' },
+                    errorMessage: { attributes: { statusCode: 422, reasonPhrase: 'Unprocessable Entity' } }
+                }]" />
+        </munit:behavior>
+        <munit:validation>
+            <!-- Unmapped type + downstream status: passthrough -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough(vars.unknown422, vars.errorList).code]"
+                expected="#[422]" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough(vars.unknown422, vars.errorList).reason]"
+                expected="#['Unprocessable Entity']" />
+            <!-- Message keeps the UNKNOWN entry's message -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough(vars.unknown422, vars.errorList).message]"
+                expected="#['default']" />
+            <!-- Missing reasonPhrase keeps the UNKNOWN entry's reason -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough({
+                    errorType: { namespace: 'MULE', identifier: 'UNKNOWN' },
+                    errorMessage: { attributes: { statusCode: 495 } }
+                }, vars.errorList).reason]"
+                expected="#['Internal Server Error']" />
+            <!-- Mapped type: null, even with a downstream status present -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough({
+                    errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' },
+                    errorMessage: { attributes: { statusCode: 422 } }
+                }, vars.errorList)]"
+                expected="#[null]" />
+            <!-- Explicit custom MULE:UNKNOWN entry wins: null -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough(vars.unknown422, vars.errorList, {
+                    'MULE:UNKNOWN': { code: 599, reason: 'Custom Unknown', message: 'custom' }
+                })]"
+                expected="#[null]" />
+            <!-- No status code: null -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough({
+                    errorType: { namespace: 'MULE', identifier: 'UNKNOWN' },
+                    errorMessage: { attributes: {} }
+                }, vars.errorList)]"
+                expected="#[null]" />
+            <!-- Non-numeric status code: null -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough({
+                    errorType: { namespace: 'MULE', identifier: 'UNKNOWN' },
+                    errorMessage: { attributes: { statusCode: 'not-a-number' } }
+                }, vars.errorList)]"
+                expected="#[null]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
         name="get-previous-error-message-edge-cases"
         description="getPreviousErrorMessage extracts childErrors/suppressedErrors/standard payloads, deduplicates messages, converts Binary and plain text safely, and returns an empty String when there is no nested error.">
         <munit:behavior>

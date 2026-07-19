@@ -2,10 +2,21 @@
 id: 014
 title: "Decide downstream-422 handling given MULE:UNKNOWN"
 label: wayfinder:grilling
-status: open
-assignee:
+status: closed
+assignee: anderson.guarnier
 blocked-by: []
 ---
+
+## Resolution (2026-07-19)
+
+**Built-in passthrough, opt-in, generalized** — new optional boolean parameter `propagateStatusCode` (Advanced tab, default `false`):
+
+1. Applies when the error type has **no mapping** (would fall to the UNKNOWN entry) and `error.errorMessage.attributes.statusCode` is readable as a number — covers downstream 422 and any other unmapped status (495, 418, …).
+2. The response uses the downstream `statusCode` and `reasonPhrase` (falling back to the UNKNOWN entry's reason when absent); the message keeps the UNKNOWN entry's message semantics (body propagation stays the `previousError` mechanism's job).
+3. An explicit mapping — including a custom `MULE:UNKNOWN` entry — wins over passthrough: the consumer's stated intent beats inference.
+4. Precedence order in the operation: nested resolution (`resolveNestedErrors`) → status-code passthrough (`propagateStatusCode`) → normal `getError` resolution.
+
+Implemented in this session (same TDD flow as ticket 010).
 
 ## Question
 

@@ -496,6 +496,76 @@
     </munit:test>
 
     <munit:test
+        name="propagate-status-code-uses-downstream-status"
+        description="With propagateStatusCode=true a downstream 422 reply (surfacing as MULE:UNKNOWN, captured fixture) responds with the downstream status and reason instead of 500 (wayfinder ticket 014).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/Http422UnprocessableError.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                propagateStatusCode="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(422)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Unprocessable Entity')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="propagate-status-code-defaults-to-off"
+        description="Without the parameter a downstream 422 keeps today's behavior (UNKNOWN 500) — backward compatibility.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/Http422UnprocessableError.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="propagate-status-code-yields-to-custom-unknown-entry"
+        description="An explicit custom MULE:UNKNOWN entry beats status-code passthrough — the consumer's stated intent wins.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/Http422UnprocessableError.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                propagateStatusCode="true">
+                <module-error-handler-plugin:custom-errors><![CDATA[#[{
+                    "MULE:UNKNOWN": {
+                        code: 599,
+                        reason: "Custom Unknown",
+                        message: "custom unknown handling"
+                    }
+                }]]]></module-error-handler-plugin:custom-errors>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(599)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
         name="unprocessable-entity-wildcard-maps-to-422"
         description="An app-raised error with identifier UNPROCESSABLE_ENTITY (any namespace) maps to 422 with the fixed static message (wayfinder tickets 008/012).">
         <munit:behavior>

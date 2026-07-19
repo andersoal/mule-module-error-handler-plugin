@@ -38,6 +38,7 @@ New MUnit test suites merged and passing in this repo, systematically covering t
 - [Make the Maven MUnit run repeatable](tickets/013-make-maven-munit-run-repeatable.md) — `mvn clean verify` now runs all suites on the raw pom: groupId token typo fixed, exchange plugin moved to a `release` profile (build.sh deploy passes `-Prelease`), README documents the command.
 - [Implement resolveNestedErrors in the module](tickets/010-implement-resolve-nested-errors.md) — shipped TDD: `findErrorMapping`/`getLeafErrors`/`resolveNestedErrorMapping` in common.dwl, opt-in `resolveNestedErrors` parameter wired into both transforms, 8 new tests covering all decided rules, docs section added. 30 tests green.
 - [Add 422 default mapping to defaultErrors.dwl](tickets/012-add-422-default-mapping.md) — `*:UNPROCESSABLE_ENTITY` wildcard entry with the fixed static message, test, and docs (including the downstream-422 workaround note pending the 014 decision).
+- [Decide downstream-422 handling given MULE:UNKNOWN](tickets/014-decide-downstream-422-handling.md) — built-in opt-in passthrough, generalized: new `propagateStatusCode` parameter (default false) uses `errorMessage.attributes.statusCode`/`reasonPhrase` when the error type is unmapped; explicit mappings (incl. custom `MULE:UNKNOWN`) win; precedence nested-resolution → passthrough → normal.
 
 ## Not yet specified
 

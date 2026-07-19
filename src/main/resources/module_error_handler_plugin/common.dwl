@@ -160,6 +160,39 @@ fun resolveNestedErrorMapping(muleError, defaultErrors, customErrors = {}) = do 
 }
 
 /**
+ * Resolves an error definition from the downstream response's status code
+ * (the propagateStatusCode operation behavior).
+ *
+ * Applies only when the error type has no mapping of its own — an explicit mapping,
+ * including a custom MULE:UNKNOWN entry, always wins — and the downstream status code
+ * at errorMessage.attributes.statusCode is readable as a number.  The resulting
+ * definition uses the downstream statusCode and reasonPhrase (the UNKNOWN entry's
+ * reason when absent) and keeps the UNKNOWN entry's message.
+ *
+ * @p muleError The Mule error object.
+ * @p defaultErrors The default error definitions object.
+ * @p customErrors Optional custom error definitions; merged over the defaults.
+ * @r An error definition with the downstream status, or null when passthrough does not apply.
+ */
+fun resolveStatusCodePassthrough(muleError, defaultErrors, customErrors = {}) = do {
+    var errorType    = getErrorTypeAsString(evalOrElse(() -> muleError.errorType, null))
+    var unmapped     = findErrorMapping(errorType, defaultErrors, customErrors) == null
+    var statusCode   = evalOrElse(() -> muleError.errorMessage.attributes.statusCode as Number, null)
+    var reason       = evalOrElse(() -> muleError.errorMessage.attributes.reasonPhrase, null)
+    var unknownEntry = getError(errorType, defaultErrors, customErrors)
+    ---
+    if (unmapped and (statusCode != null))
+        // Built explicitly (not via update) so a partial UNKNOWN entry cannot silently drop the status.
+        {
+            code   : statusCode,
+            reason : reason default (unknownEntry.reason default "Internal Server Error"),
+            message: unknownEntry.message
+        }
+    else
+        null
+}
+
+/**
  * Converts a value to a String representation.
  * Binary is read as text; if the bytes are not readable as text, it falls back to Base64.
  * Primitives are directly converted to Strings.

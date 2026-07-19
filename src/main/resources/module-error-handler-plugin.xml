@@ -199,6 +199,16 @@
                 role="BEHAVIOUR"
                 tab="Advanced" />
 
+            <parameter
+                name="propagateStatusCode"
+                type="boolean"
+                use="OPTIONAL"
+                displayName="Propagate Downstream Status Code"
+                defaultValue="false"
+                summary="When true and the error type has no mapping (would return 500), the downstream response status code and reason phrase (error.errorMessage.attributes) are used instead.  Covers statuses without a dedicated Mule error type, e.g. 422.  An explicit mapping, including a custom MULE:UNKNOWN entry, always wins."
+                role="BEHAVIOUR"
+                tab="Advanced" />
+
         </parameters>
 
         <body>
@@ -232,13 +242,18 @@
                 category="org.mulesoft.modules.errorhandler"></mule:logger>
 
             <!-- Resolve the error definition once for both the payload and the attributes.
-                 With resolveNestedErrors, the leaf standard error's mapping wins; the wrapper's own mapping is the fallback. -->
+                 Precedence: nested resolution (resolveNestedErrors), then downstream status-code
+                 passthrough (propagateStatusCode), then normal resolution. -->
             <mule:set-variable
                 value="#[output application/java
-                    import getError, resolveNestedErrorMapping from module_error_handler_plugin::common
+                    import getError, resolveNestedErrorMapping, resolveStatusCodePassthrough from module_error_handler_plugin::common
                     ---
                     (if (vars.resolveNestedErrors default false)
                         resolveNestedErrorMapping(vars.error, vars.defaultErrors, vars.customErrors default {})
+                    else
+                        null)
+                    default (if (vars.propagateStatusCode default false)
+                        resolveStatusCodePassthrough(vars.error, vars.defaultErrors, vars.customErrors default {})
                     else
                         null)
                     default getError(vars.errorType, vars.defaultErrors, vars.customErrors default {})]"
