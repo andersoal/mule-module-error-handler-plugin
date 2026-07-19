@@ -124,6 +124,135 @@
     </munit:test>
 
     <munit:test
+        name="find-error-mapping-returns-null-when-unmatched"
+        description="findErrorMapping resolves with the same precedence as getError (exact, *:IDENTIFIER, NAMESPACE:*) but returns null instead of the UNKNOWN fallback.">
+        <munit:behavior>
+            <set-variable
+                variableName="errorList"
+                value="#[{
+                    'UNKNOWN'       : { code: 500, reason: 'Internal Server Error', message: 'default' },
+                    'HTTP:NOT_FOUND': { code: 404, reason: 'Not Found', message: 'exact' },
+                    'HTTP:*'        : { code: 599, reason: 'Any HTTP', message: 'anyIdentifier' },
+                    '*:TIMEOUT'     : { code: 408, reason: 'Timeout', message: 'anyNamespace' }
+                }]" />
+        </munit:behavior>
+        <munit:validation>
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- findErrorMapping('HTTP:NOT_FOUND', vars.errorList).message]"
+                expected="#['exact']" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- findErrorMapping('SOCKETS:TIMEOUT', vars.errorList).message]"
+                expected="#['anyNamespace']" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- findErrorMapping('HTTP:TOO_MANY_REQUESTS', vars.errorList).message]"
+                expected="#['anyIdentifier']" />
+            <!-- No match: null, NOT the UNKNOWN entry -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- findErrorMapping('DB:CONNECTIVITY', vars.errorList)]"
+                expected="#[null]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-error-mapping-rules"
+        description="resolveNestedErrorMapping (wayfinder ticket 003): unwraps known wrapper types and UNKNOWN-with-nested-errors to the leaf standard errors across childErrors/suppressedErrors, recursing and deduplicating; the highest status code wins, ties keep the first occurrence; returns null when nothing resolves or unwrapping does not apply.">
+        <munit:behavior>
+            <set-variable
+                variableName="errorList"
+                value="#[{
+                    'UNKNOWN'                  : { code: 500, reason: 'Internal Server Error', message: 'default' },
+                    'HTTP:NOT_FOUND'           : { code: 404, reason: 'Not Found', message: 'nf' },
+                    'HTTP:SERVICE_UNAVAILABLE' : { code: 503, reason: 'Service Unavailable', message: 'su' },
+                    'HTTP:BAD_GATEWAY'         : { code: 503, reason: 'Bad Gateway', message: 'bg' }
+                }]" />
+        </munit:behavior>
+        <munit:validation>
+            <!-- Known wrapper, single leaf: leaf mapping wins -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' } } ]
+                }, vars.errorList).code]"
+                expected="#[404]" />
+            <!-- Mixed leaves: numeric max status wins -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [
+                        { errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' } },
+                        { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } }
+                    ]
+                }, vars.errorList).code]"
+                expected="#[503]" />
+            <!-- Tie on status code: first occurrence supplies the mapping -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [
+                        { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } },
+                        { errorType: { namespace: 'HTTP', identifier: 'BAD_GATEWAY' } }
+                    ]
+                }, vars.errorList).message]"
+                expected="#['su']" />
+            <!-- Nested composite: recursion reaches the deep leaf -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ {
+                        errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                        childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } } ]
+                    } ]
+                }, vars.errorList).code]"
+                expected="#[503]" />
+            <!-- suppressedErrors channel (Until-Successful) resolves too -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'RETRY_EXHAUSTED' },
+                    suppressedErrors: [ { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } } ]
+                }, vars.errorList).code]"
+                expected="#[503]" />
+            <!-- No resolvable leaf: null (caller falls back to the composite mapping) -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ { errorType: { namespace: 'FOO', identifier: 'BAR' } } ]
+                }, vars.errorList)]"
+                expected="#[null]" />
+            <!-- A type with its own mapping that is not a known wrapper is never unwrapped -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' },
+                    childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } } ]
+                }, vars.errorList)]"
+                expected="#[null]" />
+            <!-- Catch-all: unmapped wrapper type with nested errors is unwrapped -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'DB', identifier: 'BULK_FAILURE' },
+                    childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } } ]
+                }, vars.errorList).code]"
+                expected="#[503]" />
+            <!-- A leaf without a readable errorType (stringifies to UNKNOWN) must not outvote a mapped sibling -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [
+                        { errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' } },
+                        { description: 'no errorType here' }
+                    ]
+                }, vars.errorList).code]"
+                expected="#[404]" />
+            <!-- Custom entries for inner (leaf) types participate in leaf resolution -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ { errorType: { namespace: 'FOO', identifier: 'BAR' } } ]
+                }, vars.errorList, { 'FOO:BAR': { code: 410, reason: 'Gone', message: 'custom inner' } }).code]"
+                expected="#[410]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
         name="get-previous-error-message-edge-cases"
         description="getPreviousErrorMessage extracts childErrors/suppressedErrors/standard payloads, deduplicates messages, converts Binary and plain text safely, and returns an empty String when there is no nested error.">
         <munit:behavior>

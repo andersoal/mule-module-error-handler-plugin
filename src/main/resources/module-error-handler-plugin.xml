@@ -189,6 +189,16 @@
                 role="BEHAVIOUR"
                 tab="Advanced" />
 
+            <parameter
+                name="resolveNestedErrors"
+                type="boolean"
+                use="OPTIONAL"
+                displayName="Resolve Nested Errors"
+                defaultValue="false"
+                summary="When true, composite/wrapper errors (Scatter-Gather, Parallel For-Each, Until-Successful, VM publish-consume, Validation All) resolve to the mapping of the standard error(s) nested inside them; with mixed nested errors the highest status code wins.  The wrapper's own mapping is the fallback when no nested error resolves."
+                role="BEHAVIOUR"
+                tab="Advanced" />
+
         </parameters>
 
         <body>
@@ -221,12 +231,26 @@
                 message="Custom Errors: #[vars.customErrors]"
                 category="org.mulesoft.modules.errorhandler"></mule:logger>
 
+            <!-- Resolve the error definition once for both the payload and the attributes.
+                 With resolveNestedErrors, the leaf standard error's mapping wins; the wrapper's own mapping is the fallback. -->
+            <mule:set-variable
+                value="#[output application/java
+                    import getError, resolveNestedErrorMapping from module_error_handler_plugin::common
+                    ---
+                    (if (vars.resolveNestedErrors default false)
+                        resolveNestedErrorMapping(vars.error, vars.defaultErrors, vars.customErrors default {})
+                    else
+                        null)
+                    default getError(vars.errorType, vars.defaultErrors, vars.customErrors default {})]"
+                doc:name="Error Definition"
+                variableName="errorDefinition" />
+
             <ee:transform doc:name="Set payload to error">
                 <ee:message>
                     <ee:set-payload><![CDATA[%dw 2.0
                         import * from module_error_handler_plugin::common
                         output application/json
-                        var error = getError(vars.errorType, vars.defaultErrors, vars.customErrors default {})
+                        var error = vars.errorDefinition
                         var responseKey = vars.responseKey
                         var responseError = error update {
                                 // Use the previous error message if it exists, otherwise use the provided message.
@@ -248,7 +272,7 @@
                     <ee:set-attributes><![CDATA[%dw 2.0
                         import * from module_error_handler_plugin::common
                         output application/java
-                        var error           = getError(vars.errorType, vars.defaultErrors, vars.customErrors default {})
+                        var error           = vars.errorDefinition
                         var code            = error.code default 500
                         var message         = toString(error.message, "Internal Server Error")
                         var previousMessage = toString(vars.previousError)

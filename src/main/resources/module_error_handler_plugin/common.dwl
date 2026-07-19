@@ -46,10 +46,18 @@ fun getErrorTypeAsString(errorType) =
     else
         "UNKNOWN"
 
-/*
- * Get the proper error from the merged default and custom error lists.  Provide a standard error if none found.
+/**
+ * Finds the error definition for an error type in the merged default and custom error lists.
+ * Precedence: exact match, then *:IDENTIFIER, then NAMESPACE:*.
+ * Unlike getError, returns null when nothing matches instead of the UNKNOWN fallback,
+ * so callers can distinguish "mapped" from "unmapped" error types.
+ *
+ * @p errorType The error type as a String, e.g. "HTTP:NOT_FOUND".
+ * @p defaultErrors The default error definitions object.
+ * @p customErrors Optional custom error definitions; merged over the defaults.
+ * @r The matching error definition, or null when there is none.
  */
-fun getError(errorType, defaultErrors, customErrors = {}) = do {
+fun findErrorMapping(errorType, defaultErrors, customErrors = {}) = do {
     import mergeWith from dw::core::Objects
 
     var errorTypeAnyNamespace  = ( do { var n = ((errorType splitBy  ":")[0] default "") --- if (!isBlank(n)) n ++ ":*" else errorType } )
@@ -63,15 +71,92 @@ fun getError(errorType, defaultErrors, customErrors = {}) = do {
     var foundAnyNamespace  = if( isEmpty(foundError)                                ) errorList[errorTypeAnyNamespace]  else {}
     // e.g. *:CONNECTIVITY
     var foundAnyIdentifier = if( isEmpty(foundError) and isEmpty(foundAnyNamespace) ) errorList[errorTypeAnyIdentifier] else {}
-
-    var error = (
+    ---
          if ( !isEmpty(foundError        ) ) foundError
     else if ( !isEmpty(foundAnyIdentifier) ) foundAnyIdentifier
     else if ( !isEmpty(foundAnyNamespace ) ) foundAnyNamespace
-    else                                     errorList["UNKNOWN"]
-    )
+    else                                     null
+}
+
+/*
+ * Get the proper error from the merged default and custom error lists.  Provide a standard error if none found.
+ */
+fun getError(errorType, defaultErrors, customErrors = {}) = do {
+    import mergeWith from dw::core::Objects
     ---
-    error
+    findErrorMapping(errorType, defaultErrors, customErrors)
+        default (defaultErrors mergeWith (customErrors default {}))["UNKNOWN"]
+}
+
+/**
+ * Collects the nested errors of a Mule error: childErrors (composite scopes like
+ * Scatter-Gather, Parallel For-Each, Validation "All") and suppressedErrors
+ * (Until-Successful retries).  Every access is guarded because these fields may be
+ * absent or unreadable on some error shapes.
+ *
+ * @p muleError The Mule error object.
+ * @r Array of nested error objects; empty when there are none.
+ */
+fun getNestedErrors(muleError) =
+    (evalOrElse(() -> muleError.childErrors, []) default []) ++ (evalOrElse(() -> muleError.suppressedErrors, []) default [])
+
+/**
+ * Recursively walks the nested-error tree down to the leaf standard errors —
+ * nested errors that carry no nested errors of their own.  Intermediate composite
+ * nodes are skipped; e.g. a Scatter-Gather inside a Parallel For-Each yields the
+ * failing routes' errors, not the inner Scatter-Gather wrapper.
+ *
+ * @p muleError The Mule error object.
+ * @r Array of leaf error objects; empty when the error has no nested errors.
+ */
+fun getLeafErrors(muleError) =
+    getNestedErrors(muleError) flatMap ((child) -> do {
+        var deeper = getLeafErrors(child)
+        ---
+        if (isEmpty(deeper)) [child] else deeper
+    })
+
+/**
+ * Resolves the error definition of the standard error(s) nested inside a composite or
+ * wrapper error (the resolveNestedErrors operation behavior).
+ *
+ * Unwrapping is attempted when the top-level error type is a known wrapper type
+ * (Scatter-Gather/Parallel For-Each, Until-Successful, VM publish-consume, Validation "All"),
+ * or — as a catch-all for uncataloged wrapper types — when the type has no mapping of its
+ * own and nested errors are present.
+ *
+ * The nested-error tree is walked to its leaf standard errors (deduplicated by error type);
+ * each leaf resolves against the merged default+custom list, and the definition with the
+ * highest status code wins (ties keep the first occurrence).
+ *
+ * @p muleError The Mule error object.
+ * @p defaultErrors The default error definitions object.
+ * @p customErrors Optional custom error definitions; merged over the defaults.
+ * @r The winning leaf error definition, or null when unwrapping does not apply or no leaf
+ *    has a mapping (callers then fall back to the top-level error's own resolution).
+ */
+fun resolveNestedErrorMapping(muleError, defaultErrors, customErrors = {}) = do {
+    var wrapperTypes = ["MULE:COMPOSITE_ROUTING", "MULE:RETRY_EXHAUSTED", "VM:PUBLISH_CONSUMER_FLOW_ERROR", "VALIDATION:MULTIPLE"]
+
+    var errorType     = getErrorTypeAsString(evalOrElse(() -> muleError.errorType, null))
+    var hasOwnMapping = findErrorMapping(errorType, defaultErrors, customErrors) != null
+    // Leaves without a readable errorType stringify to UNKNOWN and must not resolve (the UNKNOWN
+    // entry would outvote mapped siblings); they fall out here instead.
+    var leafTypes     = ((getLeafErrors(muleError) map ((leaf) -> getErrorTypeAsString(evalOrElse(() -> leaf.errorType, null)))) distinctBy $) filter ($ != "UNKNOWN")
+
+    var shouldAttempt = (wrapperTypes contains errorType) or (!hasOwnMapping and !isEmpty(leafTypes))
+
+    var resolvable =
+        if (shouldAttempt)
+            (leafTypes map ((leafType) -> findErrorMapping(leafType, defaultErrors, customErrors))) filter ($ != null)
+        else
+            []
+    ---
+    if (isEmpty(resolvable))
+        null
+    else
+        // Highest status code wins; orderBy is stable, so ties keep the first occurrence.
+        (resolvable orderBy (-(($.code default 0) as Number)))[0]
 }
 
 /**

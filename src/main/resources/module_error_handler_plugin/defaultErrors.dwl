@@ -28,6 +28,14 @@ fun getMessage(message) =
     // The error object is only available through vars.error inside the module's operation; a bare `error` resolves to null here.
     message: vars.error.description default vars.badRequestError
   },
+  // App-raised semantic validation errors, e.g. raise-error type="APP:UNPROCESSABLE_ENTITY".
+  // Fixed static message by design: override via customErrors if different text is needed.
+  // Note: a downstream 422 reply surfaces as MULE:UNKNOWN, which cannot be mapped here.
+  "*:UNPROCESSABLE_ENTITY": {
+    code   : 422,
+    reason : "Unprocessable Entity",
+    message: "The request was well-formed but could not be processed."
+  },
   "OS:KEY_NOT_FOUND": {
     code   : 404,
     reason : "Key Not Found",

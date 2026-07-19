@@ -348,6 +348,182 @@
     </munit:test>
 
     <munit:test
+        name="resolve-nested-errors-unwraps-scatter-gather-leaf"
+        description="With resolveNestedErrors=true a Scatter-Gather wrapping a single HTTP:METHOD_NOT_ALLOWED resolves to the leaf's 405 mapping instead of UNKNOWN 500.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(405)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Method Not Allowed')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-unwraps-until-successful-suppressed"
+        description="With resolveNestedErrors=true an Until-Successful (MULE:RETRY_EXHAUSTED) resolves via its suppressedErrors leaf (HTTP:SERVICE_UNAVAILABLE, 503).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/UntilSuccessfulSuppressedErrors.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(503)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Service Unavailable')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-picks-highest-status"
+        description="With mixed leaf types the numeric-max status wins: a 404 and a 503 child resolve to 503.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[%dw 2.0 --- readUrl("classpath://examples/ScatterGather.json", "application/json") update {
+                    case .childErrors -> [
+                        { errorType: { namespace: "HTTP", identifier: "NOT_FOUND" } },
+                        { errorType: { namespace: "HTTP", identifier: "SERVICE_UNAVAILABLE" } }
+                    ]
+                }]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(503)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-beats-custom-composite-entry"
+        description="With resolveNestedErrors=true the unwrapped leaf mapping wins over an explicit customErrors entry for the composite type (wayfinder ticket 003, precedence rule).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true">
+                <module-error-handler-plugin:custom-errors><![CDATA[#[{
+                    "MULE:COMPOSITE_ROUTING": {
+                        code: 502,
+                        reason: "Composite Routing Failure",
+                        message: "One or more parallel routes failed"
+                    }
+                }]]]></module-error-handler-plugin:custom-errors>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(405)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-falls-back-when-no-leaf-resolves"
+        description="When no leaf has a mapping, the composite's own resolution applies (here a customErrors entry for the composite type).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[%dw 2.0 --- readUrl("classpath://examples/ScatterGather.json", "application/json") update {
+                    case .childErrors -> [ { errorType: { namespace: "FOO", identifier: "BAR" } } ]
+                }]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true">
+                <module-error-handler-plugin:custom-errors><![CDATA[#[{
+                    "MULE:COMPOSITE_ROUTING": {
+                        code: 502,
+                        reason: "Composite Routing Failure",
+                        message: "One or more parallel routes failed"
+                    }
+                }]]]></module-error-handler-plugin:custom-errors>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(502)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-defaults-to-off"
+        description="Without the parameter the composite keeps today's behavior (UNKNOWN 500) — backward compatibility.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="unprocessable-entity-wildcard-maps-to-422"
+        description="An app-raised error with identifier UNPROCESSABLE_ENTITY (any namespace) maps to 422 with the fixed static message (wayfinder tickets 008/012).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'APP', identifier: 'UNPROCESSABLE_ENTITY' },
+                    description: 'row 3 failed business validation'
+                }]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(422)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Unprocessable Entity')]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo('The request was well-formed but could not be processed.')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
         name="use-generated-error-false-returns-configured-message"
         description="With useGeneratedError=false the configured static message is returned instead of the error description.">
         <munit:behavior>

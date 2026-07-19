@@ -2,10 +2,20 @@
 id: 010
 title: "Implement resolveNestedErrors in the module"
 label: wayfinder:task
-status: open
-assignee:
+status: closed
+assignee: anderson.guarnier
 blocked-by: [009]
 ---
+
+## Resolution (2026-07-19)
+
+Implemented per ticket 003's decision, TDD (red run confirmed, then green: 30 tests):
+
+- `common.dwl`: new `findErrorMapping` (getError's precedence, null instead of UNKNOWN fallback — `getError` now delegates to it), `getNestedErrors` (guarded childErrors ++ suppressedErrors), `getLeafErrors` (recursive walk to leaf standard errors), and `resolveNestedErrorMapping` (tiered trigger: known wrapper list or unmapped-type-with-nested-errors; dedup by leaf type; numeric-max status wins via stable orderBy so ties keep first occurrence; null when nothing resolves).
+- `module-error-handler-plugin.xml`: new optional `resolveNestedErrors` boolean parameter (Advanced tab, default false); both transforms resolve `nestedError default getError(...)` — unwrap wins over a custom composite entry, wrapper mapping is the fallback.
+- Tests: `resolve-nested-error-mapping-rules` + `find-error-mapping-returns-null-when-unmatched` (DW level, 12 assertions) and 6 operation-level tests (Scatter-Gather leaf → 405, Until-Successful suppressed → 503, mixed leaves → numeric max, unwrap beats custom composite entry, fallback when no leaf resolves, default-off backward compatibility).
+- Docs: "Resolve Nested Errors" section in `exchange-docs/home.md`.
+- Serialization guards honored (ticket 009's `write()` NPE): all nested-error access goes through `evalOrElse`.
 
 ## Question
 
