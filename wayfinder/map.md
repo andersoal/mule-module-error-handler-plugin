@@ -10,7 +10,14 @@ Tickets live in `wayfinder/tickets/`. A ticket is claimed by setting its `assign
 
 ## Destination
 
-New MUnit test suites merged and passing in this repo, systematically covering the error-shape matrix — standard and composite errors × payload shapes (JSON, HTML, plain text, Binary, XML, null/empty, Java objects/streams) — with real MUnit flows producing genuine composite errors, plus the composite-unwrapping decision resolved and locked in by tests.
+New MUnit test suites merged and passing in this repo, systematically covering the error-shape matrix — standard and composite errors × payload shapes (JSON, HTML, plain text, Binary, XML, null/empty, Java objects/streams) — with real MUnit flows producing genuine composite errors, plus the composite-unwrapping decision resolved and locked in by tests. **Reached** (tickets 001–014). A follow-on robustness extension (tickets 015–016) was scoped afterward from comparing the parallel `feature/safe-error-extraction-and-munit-tests` branch — see Follow-on below.
+
+## Follow-on: robustness hardening (tickets 015–016)
+
+Scoped 2026-07-20 after analysing the parallel `feature/safe-error-extraction-and-munit-tests` branch against this one. All but one of that branch's IMPROVEMENTS.md considerations were already covered here; the gap and the thin spots became two frontier tickets:
+
+- [Harden the module against corrupted error objects](tickets/015-harden-against-corrupted-error-objects.md) — the feature branch's fatal-error body-wrap (§2), merged with DataWeave-level guards; keeps the verified `errorMessage.attributes` path.
+- [Pin thin edge-case extraction scenarios](tickets/016-pin-thin-edge-case-extraction-scenarios.md) — no-errorMessage child, mixed null/missing payloads, 4-level nesting.
 
 ## Notes
 
