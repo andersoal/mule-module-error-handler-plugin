@@ -155,6 +155,10 @@ This operation processes any exception to a proper API error response.  It provi
 - `attributes.httpStatus`: the HTTP response status code.
 - `attributes.errorLog`: the string of all aggregated errors: error message, previous error message, and error object's description.  The module converts all types to strings and removes duplicates and empties.
 
+#### Fatal-Error Safety
+
+The operation body is wrapped in a `try` scope. If the incoming error object is corrupted, is a Java exception DataWeave cannot serialize, or otherwise makes a processing step throw, the module returns a guaranteed 500 response — `{ "error": { "code": 500, "reason": "Internal Server Error", "message": "An unexpected error occurred while processing the error response" } }` with `httpStatus: 500` and `errorLog: "Error Handler Plugin fatal fallback"` — instead of throwing a fatal that would leave the caller with no reply. This fallback always uses the default `error` response key regardless of the _Response Key_ parameter, because it must not depend on any potentially-bad input. The direct `error.errorType` and `error.description` reads are also individually guarded, so a merely-unusual (non-fatal) error still resolves to its normal mapping rather than the generic fallback.
+
 #### Resolve Nested Errors
 
 By default, a composite error such as a Scatter-Gather failure maps by its own type (usually `MULE:COMPOSITE_ROUTING`, which has no mapping and returns _500 Internal Server Error_), even when the failing route raised a well-known error like `HTTP:NOT_FOUND`.

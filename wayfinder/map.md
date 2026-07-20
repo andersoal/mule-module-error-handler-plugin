@@ -19,6 +19,11 @@ Scoped 2026-07-20 after analysing the parallel `feature/safe-error-extraction-an
 - [Harden the module against corrupted error objects](tickets/015-harden-against-corrupted-error-objects.md) — the feature branch's fatal-error body-wrap (§2), merged with DataWeave-level guards; keeps the verified `errorMessage.attributes` path.
 - [Pin thin edge-case extraction scenarios](tickets/016-pin-thin-edge-case-extraction-scenarios.md) — no-errorMessage child, mixed null/missing payloads, 4-level nesting.
 
+Both closed 2026-07-20. Decisions:
+
+- [Harden the module against corrupted error objects](tickets/015-harden-against-corrupted-error-objects.md) — body wrapped in `<try>` with a guaranteed-500 catastrophic fallback; `errorType`/`description` reads guarded via `evalOrElse`; verified `errorMessage.attributes` path kept. TDD via a forced-coercion-throw test.
+- [Pin thin edge-case extraction scenarios](tickets/016-pin-thin-edge-case-extraction-scenarios.md) — three structural shapes pinned at the DW-unit level; behaviour was already correct. 64 tests green across 9 suites.
+
 ## Notes
 
 - **This is a plugin** (XML-SDK module), not an app: it has no flows, listeners, or error handlers of its own. Tests exercise the `process-error` operation directly (or via helper flows defined inside the MUnit suite files); consumer-app wiring is out of scope. Any default-mapping change (e.g. 422) must weigh backward compatibility for existing consumers.

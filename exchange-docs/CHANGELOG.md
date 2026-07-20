@@ -10,6 +10,7 @@ All notable changes to the Error Handler Plugin are documented in this file.
 - **`propagateStatusCode` parameter** (default `false`): when the error type has no mapping (e.g. a downstream 422, which surfaces as `MULE:UNKNOWN`), the response uses the downstream status code and reason phrase instead of 500.
 - **`*:UNPROCESSABLE_ENTITY` default mapping** to 422 Unprocessable Entity with a fixed static message.
 - **MUnit runnable via Maven**: `mvn clean verify` runs all suites (Exchange publication moved to the `release` profile); per-construct suites raise genuine runtime errors (Scatter-Gather, Parallel For-Each, Until-Successful, Validation, VM, Async/Foreach).
+- **Fatal-error safety**: the operation body is wrapped so that a corrupted, unserializable, or fatally-inaccessible error object returns a guaranteed 500 response instead of a fatal that leaves the caller with no reply. The direct `error.errorType` and `error.description` reads are individually guarded so a merely-odd error still resolves normally.
 
 ### Changed (unreleased on top of 6.4.0)
 

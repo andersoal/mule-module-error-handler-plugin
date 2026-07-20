@@ -212,19 +212,36 @@
         </parameters>
 
         <body>
+          <!--
+              The entire body runs inside a <try>: if a corrupted, unserializable, or otherwise
+              fatally-inaccessible error object makes any step throw, the on-error-continue below
+              returns a guaranteed 500 response instead of a fatal that would leave the caller
+              with no reply.  The direct error-object reads (errorType, description) are also
+              individually guarded so a merely-odd error still resolves normally rather than
+              falling to the generic fallback.
+          -->
+          <mule:try doc:name="Safe Error Processing Wrapper">
             <mule:set-variable
                 value="#[output application/java
-                    import getErrorTypeAsString from module_error_handler_plugin::common
+                    import getErrorTypeAsString, evalOrElse from module_error_handler_plugin::common
                     ---
-                    getErrorTypeAsString(vars.error.errorType)]"
+                    evalOrElse(() -> getErrorTypeAsString(vars.error.errorType), 'UNKNOWN')]"
                 doc:name="Error Type"
                 variableName="errorType" />
+
+            <mule:set-variable
+                value="#[output application/java
+                    import evalOrElse from module_error_handler_plugin::common
+                    ---
+                    evalOrElse(() -> vars.error.description, '')]"
+                doc:name="Safe Error Description"
+                variableName="safeDescription" />
 
             <mule:logger
                 level="DEBUG"
                 category="org.mulesoft.modules.errorhandler"
                 message='#[output application/java ---
-                    "Error type: " ++ (vars.errorType default "") ++ "  Error Description: " ++ (vars.error.description default "")]' />
+                    "Error type: " ++ (vars.errorType default "") ++ "  Error Description: " ++ (vars.safeDescription default "")]' />
 
             <!-- Load the default error definitions. -->
             <mule:set-variable
@@ -291,7 +308,7 @@
                         var code            = error.code default 500
                         var message         = toString(error.message, "Internal Server Error")
                         var previousMessage = toString(vars.previousError)
-                        var description     = toString(vars.error.description)
+                        var description     = toString(vars.safeDescription)
 
                         // Concatenate current error message, previous error message, and error description without duplicates or empties
                         var log = (([message, previousMessage, description] filter !isEmpty($)) distinctBy $) joinBy " | "
@@ -308,6 +325,42 @@
                 level="DEBUG"
                 category="org.mulesoft.modules.errorhandler"
                 message='#[output application/java --- "Error HTTP Status: $(attributes.httpStatus default 500)  Error Response: $(write(payload, "application/json") default "")"]' />
+
+            <mule:error-handler>
+                <!--
+                    Last-resort fallback: if any step above still threw (e.g. a corrupted error
+                    object DataWeave cannot process, or a misconfigured custom error), return a
+                    guaranteed valid 500 rather than propagating a fatal.  Uses the default
+                    'error' response key regardless of the responseKey parameter, since this path
+                    must not depend on any potentially-bad input.
+                -->
+                <mule:on-error-continue doc:name="On Fatal - Safe 500 Fallback" logException="true">
+                    <ee:transform doc:name="Catastrophic Fallback Response">
+                        <ee:message>
+                            <ee:set-payload><![CDATA[%dw 2.0
+                                output application/json
+                                ---
+                                {
+                                    error: {
+                                        code   : 500,
+                                        reason : "Internal Server Error",
+                                        message: "An unexpected error occurred while processing the error response"
+                                    }
+                                }]]>
+                            </ee:set-payload>
+                            <ee:set-attributes><![CDATA[%dw 2.0
+                                output application/java
+                                ---
+                                {
+                                    httpStatus: 500,
+                                    errorLog  : "Error Handler Plugin fatal fallback"
+                                }]]>
+                            </ee:set-attributes>
+                        </ee:message>
+                    </ee:transform>
+                </mule:on-error-continue>
+            </mule:error-handler>
+          </mule:try>
         </body>
 
         <output type="OutputResponseType"></output>

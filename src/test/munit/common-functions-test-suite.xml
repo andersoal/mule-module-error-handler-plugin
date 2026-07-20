@@ -205,6 +205,19 @@
                     } ]
                 }, vars.errorList).code]"
                 expected="#[503]" />
+            <!-- 4-level nesting: recursion resolves the leaf mapping through three composite wrappers (ticket 016) -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ {
+                        errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                        childErrors: [ {
+                            errorType: { namespace: 'VALIDATION', identifier: 'MULTIPLE' },
+                            childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' } } ]
+                        } ]
+                    } ]
+                }, vars.errorList).code]"
+                expected="#[404]" />
             <!-- suppressedErrors channel (Until-Successful) resolves too -->
             <munit-tools:assert-equals
                 actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
@@ -382,6 +395,58 @@
             <munit-tools:assert-equals
                 actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage(null)]"
                 expected="#['']" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="get-previous-error-message-structural-edge-cases"
+        description="getPreviousErrorMessage handles structurally inconsistent composites (wayfinder ticket 016): a child with no errorMessage, mixed JSON/text/null/missing payloads, and 4-level nesting.">
+        <munit:validation>
+            <!-- A childError with no errorMessage field is skipped; the sibling with a payload still extracts -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [
+                        { errorMessage: { payload: 'the one real failure' } },
+                        { errorType: { namespace: 'X', identifier: 'NO_MESSAGE' } }
+                    ]
+                })]"
+                expected="#['the one real failure']" />
+            <!-- Mixed payload types (JSON object, text, null, and a child with no payload) aggregate the non-empties without failing -->
+            <munit-tools:assert-that
+                expression="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [
+                        { errorMessage: { payload: { error: { message: 'json failure' } } } },
+                        { errorMessage: { payload: 'text failure' } },
+                        { errorMessage: { payload: null } },
+                        { errorType: { namespace: 'X', identifier: 'NO_MESSAGE' } }
+                    ]
+                })]"
+                is="#[MunitTools::containsString('json failure')]" />
+            <munit-tools:assert-that
+                expression="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [
+                        { errorMessage: { payload: { error: { message: 'json failure' } } } },
+                        { errorMessage: { payload: 'text failure' } },
+                        { errorMessage: { payload: null } },
+                        { errorType: { namespace: 'X', identifier: 'NO_MESSAGE' } }
+                    ]
+                })]"
+                is="#[MunitTools::containsString('text failure')]" />
+            <!-- Drops empties: a composite whose children are all null/missing payloads yields the empty string, not a crash -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [
+                        { errorMessage: { payload: null } },
+                        { errorType: { namespace: 'X', identifier: 'NO_MESSAGE' } }
+                    ]
+                })]"
+                expected="#['']" />
+            <!-- 4-level nesting (Parallel-Foreach > Scatter-Gather > Validation > leaf): the descendant walk reaches the deep leaf -->
+            <munit-tools:assert-that
+                expression="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [ { childErrors: [ { childErrors: [ { errorMessage: { payload: 'deep leaf failure' } } ] } ] } ]
+                })]"
+                is="#[MunitTools::containsString('deep leaf failure')]" />
         </munit:validation>
     </munit:test>
 

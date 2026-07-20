@@ -613,4 +613,102 @@
         </munit:validation>
     </munit:test>
 
+    <!-- ===== Fatal-error hardening (wayfinder ticket 015) ===== -->
+
+    <munit:test
+        name="corrupted-custom-code-triggers-catastrophic-fallback"
+        description="A misconfigured custom error whose code cannot coerce to a Number would fatal the attributes transform; the operation-body wrapper returns a guaranteed 500 fallback instead of no response.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:custom-errors><![CDATA[#[{
+                    "MULE:COMPOSITE_ROUTING": { code: "not-a-number", reason: "Bad", message: "boom" }
+                }]]]></module-error-handler-plugin:custom-errors>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[attributes.errorLog]"
+                is="#[MunitTools::containsString('fallback')]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="null-error-type-resolves-to-unknown-500-via-normal-path"
+        description="An error object with no errorType resolves to UNKNOWN 500 through the normal path (guarded error-type read), NOT the catastrophic fallback.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{ description: 'no type here' }]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Internal Server Error')]" />
+            <!-- Distinguishes the guarded normal path from the fallback, which produces an identical 500/reason -->
+            <munit-tools:assert-that
+                expression="#[attributes.errorLog]"
+                is="#[MunitTools::not(MunitTools::containsString('fallback'))]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="empty-error-type-resolves-to-unknown-500-via-normal-path"
+        description="An error whose errorType is an empty object resolves to UNKNOWN 500 through the normal path, not the fallback.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{ errorType: {}, description: 'empty type' }]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[attributes.errorLog]"
+                is="#[MunitTools::not(MunitTools::containsString('fallback'))]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="missing-description-does-not-break-handler"
+        description="An error object with no description and no errorMessage resolves normally (guarded description read).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{ errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' } }]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(404)]" />
+        </munit:validation>
+    </munit:test>
+
 </mule>
