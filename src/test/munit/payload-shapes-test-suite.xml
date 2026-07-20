@@ -70,4 +70,346 @@
         </munit:validation>
     </munit:test>
 
+    <!--
+        ===== Payload axis: standard errors =====
+        One cell per reply-body shape, exercised through the full operation (ee:transform),
+        complementing the DW-unit coverage in common-functions-test-suite.xml.
+        Reconciliation: the plain-text and Binary standard-error operation cases already live in
+        process-error-test-suite.xml (text-plain-error-payload-does-not-break-handler,
+        binary-error-payload-does-not-break-handler); not duplicated here.
+        Skipped-with-reason: repeatable stream — cannot be staged deterministically without a
+        connector round-trip; the Binary cell covers the unreadable-content path (ticket 005).
+    -->
+
+    <munit:test
+        name="json-object-payload-renders-through-operation"
+        description="A standard error whose errorMessage.payload is a JSON object surfaces as the response message via the previous-error path.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' },
+                    errorMessage: { payload: { error: { code: 'E-404', detail: 'record 77 not found' } } }
+                }]" />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(404)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('record 77 not found')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="html-string-payload-does-not-break-handler"
+        description="A standard error whose errorMessage.payload is an HTML page (a String) is returned as text instead of failing on a descendant selector.">
+        <munit:behavior>
+            <set-variable
+                variableName="htmlBody"
+                value='#[readUrl("classpath://examples/errorBody.html", "text/plain")]' />
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'HTTP', identifier: 'BAD_GATEWAY' },
+                    errorMessage: { payload: vars.htmlBody }
+                }]" />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(502)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('502 Bad Gateway')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="xml-object-payload-does-not-break-handler"
+        description="A standard error whose errorMessage.payload is a parsed XML object is rendered (as JSON) without failing the handler.">
+        <munit:behavior>
+            <set-variable
+                variableName="xmlBody"
+                value='#[readUrl("classpath://examples/errorBody.xml", "application/xml")]' />
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'HTTP', identifier: 'INTERNAL_SERVER_ERROR' },
+                    errorMessage: { payload: vars.xmlBody }
+                }]" />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <!-- INTERNAL_SERVER_ERROR is unmapped -> UNKNOWN 500; asserted to catch a mapping regression -->
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('SVC-0042')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="java-object-payload-renders-as-json"
+        description="A standard error whose errorMessage.payload is a complex object renders as JSON via the same toString complex-value branch the Validation bean hit — content preserved, not ClassName@hash.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' },
+                    errorMessage: { payload: { violations: [ { field: 'email', reason: 'invalid domain' } ] } }
+                }]" />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('invalid domain')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="null-and-empty-error-shapes-fall-back-to-mapping-message"
+        description="An error with a null errorMessage and empty childErrors/suppressedErrors yields no previous error, so the mapping's own message is used and the handler does not fail.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'MULE', identifier: 'UNKNOWN' },
+                    errorMessage: null,
+                    childErrors: [],
+                    suppressedErrors: []
+                }]" />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo('There is a server issue')]" />
+        </munit:validation>
+    </munit:test>
+
+    <!--
+        ===== Hot intersections: composite errors wrapping typed payloads =====
+        Where the payload-handling and construct-resolution code paths cross (ticket 004).
+        Built inline so the payload types are exact and deterministic; the construct suites
+        already cover genuine runtime composite structures.
+    -->
+
+    <munit:test
+        name="scatter-gather-wrapping-binary-route-payload"
+        description="A composite error whose route payload is Binary is converted to a String during aggregation instead of failing.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ { errorMessage: { payload: ('Downstream binary route failure' as Binary) } } ]
+                }]" />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('Downstream binary route failure')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="scatter-gather-wrapping-html-route-payload"
+        description="A composite error whose route payload is an HTML page (String) aggregates the text without failing on a descendant selector.">
+        <munit:behavior>
+            <set-variable
+                variableName="htmlBody"
+                value='#[readUrl("classpath://examples/errorBody.html", "text/plain")]' />
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ { errorMessage: { payload: vars.htmlBody } } ]
+                }]" />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('502 Bad Gateway')]" />
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="until-successful-with-html-error-body"
+        description="An Until-Successful error whose suppressed retry payload is an HTML body is aggregated as text.">
+        <munit:behavior>
+            <set-variable
+                variableName="htmlBody"
+                value='#[readUrl("classpath://examples/errorBody.html", "text/plain")]' />
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'MULE', identifier: 'RETRY_EXHAUSTED' },
+                    childErrors: [],
+                    suppressedErrors: [ { errorMessage: { payload: vars.htmlBody } } ]
+                }]" />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('502 Bad Gateway')]" />
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="nested-composite-deep-leaf-unwrap"
+        description="With resolveNestedErrors=true a Parallel For-Each wrapping a Scatter-Gather (composite inside composite) recurses to the deep HTTP:SERVICE_UNAVAILABLE leaf and resolves to 503.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ {
+                        errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                        childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } } ]
+                    } ]
+                }]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(503)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Service Unavailable')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="mixed-payload-types-in-one-composite-aggregate-dedup-safe"
+        description="A composite wrapping mixed payload types (JSON object and Binary), with a duplicate, aggregates all distinct messages without failing and deduplicates repeats.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [
+                        { errorMessage: { payload: { error: { message: 'json route failed' } } } },
+                        { errorMessage: { payload: ('binary route failed' as Binary) } },
+                        { errorMessage: { payload: { error: { message: 'json route failed' } } } }
+                    ]
+                }]" />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('json route failed')]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('binary route failed')]" />
+            <!-- Deduplicated: the repeated JSON message appears exactly once (one delimiter -> two parts) -->
+            <munit-tools:assert-that
+                expression="#[sizeOf(vars.testPreviousError splitBy 'json route failed')]"
+                is="#[MunitTools::equalTo(2)]" />
+            <!-- errorLog aggregates the same messages on the attributes path (mixed types survive) -->
+            <munit-tools:assert-that
+                expression="#[attributes.errorLog]"
+                is="#[MunitTools::containsString('binary route failed')]" />
+        </munit:validation>
+    </munit:test>
+
 </mule>

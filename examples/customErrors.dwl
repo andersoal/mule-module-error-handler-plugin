@@ -63,8 +63,8 @@ var previousError = getPreviousErrorMessage(error)
     */
     "MULE:UNKNOWN": {
         // evalOrElse guards the selectors when the error message attributes are not accessible, e.g. Binary content.
-        code: evalOrElse(() -> error.exception.errorMessage.attributes.statusCode, 500) default 500,
-        reason: evalOrElse(() -> error.exception.errorMessage.attributes.reasonPhrase, "Internal Server Error") default "Internal Server Error",
+        code   : evalOrElse(() -> error.exception.errorMessage.attributes.statusCode, 500) default 500,
+        reason : evalOrElse(() -> error.exception.errorMessage.attributes.reasonPhrase, "Internal Server Error") default "Internal Server Error",
         message: if (!isEmpty(previousError)) previousError else error.description
     }
 }

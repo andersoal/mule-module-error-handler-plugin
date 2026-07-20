@@ -42,6 +42,7 @@ New MUnit test suites merged and passing in this repo, systematically covering t
 - [Decide downstream-422 handling given MULE:UNKNOWN](tickets/014-decide-downstream-422-handling.md) — built-in opt-in passthrough, generalized: new `propagateStatusCode` parameter (default false) uses `errorMessage.attributes.statusCode`/`reasonPhrase` when the error type is unmapped; explicit mappings (incl. custom `MULE:UNKNOWN`) win; precedence nested-resolution → passthrough → normal.
 - [Build the payload-shape fixture set](tickets/005-build-payload-shape-fixtures.md) — errorBody.xml/.html added; typed payloads staged at test time via readUrl/inline DW; Java objects inline, repeatable streams skipped-with-reason.
 - [Implement flow-based composite suites](tickets/006-implement-composite-flow-suites.md) — six per-construct suites with genuine runtime errors (46 tests green across 9 suites); explore suite dissolved; found+fixed a real bug: toString rendered live Java-bean payloads as ClassName@hash, now writes JSON first. Validation Any skipped-with-reason.
+- [Implement payload-shape suites](tickets/007-implement-payload-shape-suites.md) — payload-shapes suite grown to 11 tests: payload axis (JSON/HTML/XML/Java-object/null-empty; plain-text & Binary reconciled to process-error; repeatable stream skipped-with-reason) + all five hot intersections (composite wrapping Binary/HTML, Until-Successful HTML body, nested-composite deep unwrap, mixed-payload dedup). 59 tests green across 9 suites. **Destination reached.**
 
 ## Not yet specified
 
