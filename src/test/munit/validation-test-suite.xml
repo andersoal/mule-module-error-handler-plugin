@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+    xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+    xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+    xmlns:module-error-handler-plugin="http://www.mulesoft.org/schema/mule/module-error-handler-plugin"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/module-error-handler-plugin http://www.mulesoft.org/schema/mule/module-error-handler-plugin/current/mule-module-error-handler-plugin.xsd">
+
+    <munit:config name="validation-test-suite.xml" />
+
+    <!--
+        Real-flow tests for the Validation module's aggregation errors (wayfinder ticket 006).
+        validation:all raises a genuine VALIDATION:MULTIPLE with the failed rules in childErrors.
+        Skipped-with-reason: the "any" scope — no captured fixture exists and its childErrors shape
+        is unverified on validation module 2.0.7; revisit if it enters real use (matrix, ticket 004).
+    -->
+
+    <flow name="validation-all-failures-helper-flow">
+        <validation:all>
+            <validation:is-true expression="#[false]" message="Rule 1 failed" />
+            <validation:is-true expression="#[false]" message="Rule 2 failed" />
+        </validation:all>
+    </flow>
+
+    <munit:test
+        name="validation-all-maps-to-validation-wildcard-400"
+        description="A real validation:all failure raises VALIDATION:MULTIPLE, which matches the VALIDATION:* wildcard and returns 400.">
+        <munit:execution>
+            <try>
+                <flow-ref name="validation-all-failures-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable variableName="testError" value="#[error]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[%dw 2.0 import getErrorTypeAsString from module_error_handler_plugin::common --- getErrorTypeAsString(vars.testError.errorType)]"
+                is="#[MunitTools::equalTo('VALIDATION:MULTIPLE')]" />
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(400)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Bad Request')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="validation-all-unwrap-keeps-400-via-leaves"
+        description="With resolveNestedErrors=true the VALIDATION:MULTIPLE wrapper unwraps to its VALIDATION:* leaves — still 400, proving unwrap does not change already-correct mappings.">
+        <munit:execution>
+            <try>
+                <flow-ref name="validation-all-failures-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable variableName="testError" value="#[error]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(400)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="validation-all-previous-error-aggregates-rule-failures"
+        description="getPreviousErrorMessage extracts each failed rule's message from a real VALIDATION:MULTIPLE childErrors tree.">
+        <munit:execution>
+            <try>
+                <flow-ref name="validation-all-failures-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable
+                            variableName="testPreviousError"
+                            value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(error)]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[vars.testPreviousError]"
+                is="#[MunitTools::containsString('Rule 1 failed')]" />
+            <munit-tools:assert-that
+                expression="#[vars.testPreviousError]"
+                is="#[MunitTools::containsString('Rule 2 failed')]" />
+        </munit:validation>
+    </munit:test>
+
+</mule>

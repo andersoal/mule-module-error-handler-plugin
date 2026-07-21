@@ -1,0 +1,32 @@
+{
+  "exception": {
+    "localizedMessage": "APP:BOOM: consumer flow failed",
+    "cause": null,
+    "message": "APP:BOOM: consumer flow failed",
+    "suppressed": [],
+    "stackTrace": []
+  },
+  "dslSource": "<vm:publish-consume config-ref=\"vmTestConfig\" queueName=\"exploreQueue\"></vm:publish-consume>",
+  "suppressedErrors": [],
+  "errorType": {
+    "parentErrorType": {
+      "parentErrorType": null,
+      "identifier": "ANY",
+      "namespace": "MULE"
+    },
+    "identifier": "PUBLISH_CONSUMER_FLOW_ERROR",
+    "namespace": "VM"
+  },
+  "childErrors": [],
+  "errorMessage": null,
+  "cause": {
+    "localizedMessage": "APP:BOOM: consumer flow failed",
+    "cause": null,
+    "message": "APP:BOOM: consumer flow failed",
+    "suppressed": [],
+    "stackTrace": []
+  },
+  "description": "APP:BOOM: consumer flow failed",
+  "detailedDescription": "APP:BOOM: consumer flow failed",
+  "failingComponent": "vm-publish-consume-helper-flow/processors/0 @ error-handler-plugin-test-application:explore-error-shapes-suite.xml:48"
+}

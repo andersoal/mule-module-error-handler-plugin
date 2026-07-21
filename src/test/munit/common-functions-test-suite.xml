@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+    xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+
+    <munit:config name="common-functions-test-suite.xml" />
+
+    <!--
+        Unit-level tests for the exported DataWeave functions in module_error_handler_plugin::common.
+        These validate the safe handling of Binary and text/plain content that previously
+        broke error handlers accessing error.errorMessage.payload.
+    -->
+
+    <munit:test
+        name="get-error-type-as-string"
+        description="getErrorTypeAsString formats namespace:identifier and falls back to UNKNOWN when the namespace is blank.">
+        <munit:validation>
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getErrorTypeAsString({namespace: 'HTTP', identifier: 'NOT_FOUND'})]"
+                expected="#['HTTP:NOT_FOUND']" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getErrorTypeAsString({namespace: '', identifier: 'NOT_FOUND'})]"
+                expected="#['UNKNOWN']" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getErrorTypeAsString(null)]"
+                expected="#['UNKNOWN']" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="get-error-lookup-precedence"
+        description="getError resolves exact matches first, then *:IDENTIFIER, then NAMESPACE:*, then UNKNOWN; custom errors override defaults.">
+        <munit:behavior>
+            <set-variable
+                variableName="errorList"
+                value="#[{
+                    'UNKNOWN'       : { code: 500, reason: 'Internal Server Error', message: 'default' },
+                    'HTTP:NOT_FOUND': { code: 404, reason: 'Not Found', message: 'exact' },
+                    'HTTP:*'        : { code: 599, reason: 'Any HTTP', message: 'anyIdentifier' },
+                    '*:TIMEOUT'     : { code: 408, reason: 'Timeout', message: 'anyNamespace' }
+                }]" />
+        </munit:behavior>
+        <munit:validation>
+            <!-- Exact match wins -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getError('HTTP:NOT_FOUND', vars.errorList).message]"
+                expected="#['exact']" />
+            <!-- *:IDENTIFIER match -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getError('SOCKETS:TIMEOUT', vars.errorList).message]"
+                expected="#['anyNamespace']" />
+            <!-- NAMESPACE:* match -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getError('HTTP:TOO_MANY_REQUESTS', vars.errorList).message]"
+                expected="#['anyIdentifier']" />
+            <!-- UNKNOWN fallback -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getError('DB:CONNECTIVITY', vars.errorList).message]"
+                expected="#['default']" />
+            <!-- Custom error overrides the default definition -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getError('HTTP:NOT_FOUND', vars.errorList, {'HTTP:NOT_FOUND': { code: 404, reason: 'Not Found', message: 'custom' }}).message]"
+                expected="#['custom']" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="to-string-handles-all-types"
+        description="toString converts Strings, Numbers, Binary, and complex values (as JSON so live Java beans keep their content); empty input returns the provided default.">
+        <munit:validation>
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- toString('plain')]"
+                expected="#['plain']" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- toString(42)]"
+                expected="#['42']" />
+            <!-- Binary content is read as text instead of failing -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- toString('binary content' as Binary)]"
+                expected="#['binary content']" />
+            <!-- Complex values are written as JSON, not the Java form (which loses bean content) -->
+            <munit-tools:assert-that
+                expression="#[%dw 2.0 import * from module_error_handler_plugin::common --- toString({a: 1})]"
+                is="#[MunitTools::containsString('&quot;a&quot;: 1')]" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- toString(null, 'fallback')]"
+                expected="#['fallback']" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- toString('', 'fallback')]"
+                expected="#['fallback']" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="is-empty-value-never-fails"
+        description="isEmptyValue behaves like isEmpty but does not fail on types isEmpty does not support, like Binary.">
+        <munit:validation>
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- isEmptyValue(null)]"
+                expected="#[true]" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- isEmptyValue('')]"
+                expected="#[true]" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- isEmptyValue({})]"
+                expected="#[true]" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- isEmptyValue('content' as Binary)]"
+                expected="#[false]" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- isEmptyValue('' as Binary)]"
+                expected="#[true]" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- isEmptyValue(42)]"
+                expected="#[false]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="find-error-mapping-returns-null-when-unmatched"
+        description="findErrorMapping resolves with the same precedence as getError (exact, *:IDENTIFIER, NAMESPACE:*) but returns null instead of the UNKNOWN fallback.">
+        <munit:behavior>
+            <set-variable
+                variableName="errorList"
+                value="#[{
+                    'UNKNOWN'       : { code: 500, reason: 'Internal Server Error', message: 'default' },
+                    'HTTP:NOT_FOUND': { code: 404, reason: 'Not Found', message: 'exact' },
+                    'HTTP:*'        : { code: 599, reason: 'Any HTTP', message: 'anyIdentifier' },
+                    '*:TIMEOUT'     : { code: 408, reason: 'Timeout', message: 'anyNamespace' }
+                }]" />
+        </munit:behavior>
+        <munit:validation>
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- findErrorMapping('HTTP:NOT_FOUND', vars.errorList).message]"
+                expected="#['exact']" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- findErrorMapping('SOCKETS:TIMEOUT', vars.errorList).message]"
+                expected="#['anyNamespace']" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- findErrorMapping('HTTP:TOO_MANY_REQUESTS', vars.errorList).message]"
+                expected="#['anyIdentifier']" />
+            <!-- No match: null, NOT the UNKNOWN entry -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- findErrorMapping('DB:CONNECTIVITY', vars.errorList)]"
+                expected="#[null]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-error-mapping-rules"
+        description="resolveNestedErrorMapping (wayfinder ticket 003): unwraps known wrapper types and UNKNOWN-with-nested-errors to the leaf standard errors across childErrors/suppressedErrors, recursing and deduplicating; the highest status code wins, ties keep the first occurrence; returns null when nothing resolves or unwrapping does not apply.">
+        <munit:behavior>
+            <set-variable
+                variableName="errorList"
+                value="#[{
+                    'UNKNOWN'                  : { code: 500, reason: 'Internal Server Error', message: 'default' },
+                    'HTTP:NOT_FOUND'           : { code: 404, reason: 'Not Found', message: 'nf' },
+                    'HTTP:SERVICE_UNAVAILABLE' : { code: 503, reason: 'Service Unavailable', message: 'su' },
+                    'HTTP:BAD_GATEWAY'         : { code: 503, reason: 'Bad Gateway', message: 'bg' }
+                }]" />
+        </munit:behavior>
+        <munit:validation>
+            <!-- Known wrapper, single leaf: leaf mapping wins -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' } } ]
+                }, vars.errorList).code]"
+                expected="#[404]" />
+            <!-- Mixed leaves: numeric max status wins -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [
+                        { errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' } },
+                        { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } }
+                    ]
+                }, vars.errorList).code]"
+                expected="#[503]" />
+            <!-- Tie on status code: first occurrence supplies the mapping -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [
+                        { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } },
+                        { errorType: { namespace: 'HTTP', identifier: 'BAD_GATEWAY' } }
+                    ]
+                }, vars.errorList).message]"
+                expected="#['su']" />
+            <!-- Nested composite: recursion reaches the deep leaf -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ {
+                        errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                        childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } } ]
+                    } ]
+                }, vars.errorList).code]"
+                expected="#[503]" />
+            <!-- 4-level nesting: recursion resolves the leaf mapping through three composite wrappers (ticket 016) -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ {
+                        errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                        childErrors: [ {
+                            errorType: { namespace: 'VALIDATION', identifier: 'MULTIPLE' },
+                            childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' } } ]
+                        } ]
+                    } ]
+                }, vars.errorList).code]"
+                expected="#[404]" />
+            <!-- suppressedErrors channel (Until-Successful) resolves too -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'RETRY_EXHAUSTED' },
+                    suppressedErrors: [ { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } } ]
+                }, vars.errorList).code]"
+                expected="#[503]" />
+            <!-- No resolvable leaf: null (caller falls back to the composite mapping) -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ { errorType: { namespace: 'FOO', identifier: 'BAR' } } ]
+                }, vars.errorList)]"
+                expected="#[null]" />
+            <!-- A type with its own mapping that is not a known wrapper is never unwrapped -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' },
+                    childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } } ]
+                }, vars.errorList)]"
+                expected="#[null]" />
+            <!-- Catch-all: unmapped wrapper type with nested errors is unwrapped -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'DB', identifier: 'BULK_FAILURE' },
+                    childErrors: [ { errorType: { namespace: 'HTTP', identifier: 'SERVICE_UNAVAILABLE' } } ]
+                }, vars.errorList).code]"
+                expected="#[503]" />
+            <!-- A leaf without a readable errorType (stringifies to UNKNOWN) must not outvote a mapped sibling -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [
+                        { errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' } },
+                        { description: 'no errorType here' }
+                    ]
+                }, vars.errorList).code]"
+                expected="#[404]" />
+            <!-- Custom entries for inner (leaf) types participate in leaf resolution -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveNestedErrorMapping({
+                    errorType: { namespace: 'MULE', identifier: 'COMPOSITE_ROUTING' },
+                    childErrors: [ { errorType: { namespace: 'FOO', identifier: 'BAR' } } ]
+                }, vars.errorList, { 'FOO:BAR': { code: 410, reason: 'Gone', message: 'custom inner' } }).code]"
+                expected="#[410]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-status-code-passthrough-rules"
+        description="resolveStatusCodePassthrough (wayfinder ticket 014): unmapped error types with a readable downstream statusCode resolve to that status and reason phrase, keeping the UNKNOWN entry's message; explicit mappings (including custom MULE:UNKNOWN) and missing/non-numeric status codes return null.">
+        <munit:behavior>
+            <set-variable
+                variableName="errorList"
+                value="#[{
+                    'UNKNOWN'       : { code: 500, reason: 'Internal Server Error', message: 'default' },
+                    'HTTP:NOT_FOUND': { code: 404, reason: 'Not Found', message: 'nf' }
+                }]" />
+            <set-variable
+                variableName="unknown422"
+                value="#[{
+                    errorType: { namespace: 'MULE', identifier: 'UNKNOWN' },
+                    errorMessage: { attributes: { statusCode: 422, reasonPhrase: 'Unprocessable Entity' } }
+                }]" />
+        </munit:behavior>
+        <munit:validation>
+            <!-- Unmapped type + downstream status: passthrough -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough(vars.unknown422, vars.errorList).code]"
+                expected="#[422]" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough(vars.unknown422, vars.errorList).reason]"
+                expected="#['Unprocessable Entity']" />
+            <!-- Message keeps the UNKNOWN entry's message -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough(vars.unknown422, vars.errorList).message]"
+                expected="#['default']" />
+            <!-- Missing reasonPhrase keeps the UNKNOWN entry's reason -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough({
+                    errorType: { namespace: 'MULE', identifier: 'UNKNOWN' },
+                    errorMessage: { attributes: { statusCode: 495 } }
+                }, vars.errorList).reason]"
+                expected="#['Internal Server Error']" />
+            <!-- Mapped type: null, even with a downstream status present -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough({
+                    errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' },
+                    errorMessage: { attributes: { statusCode: 422 } }
+                }, vars.errorList)]"
+                expected="#[null]" />
+            <!-- Explicit custom MULE:UNKNOWN entry wins: null -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough(vars.unknown422, vars.errorList, {
+                    'MULE:UNKNOWN': { code: 599, reason: 'Custom Unknown', message: 'custom' }
+                })]"
+                expected="#[null]" />
+            <!-- No status code: null -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough({
+                    errorType: { namespace: 'MULE', identifier: 'UNKNOWN' },
+                    errorMessage: { attributes: {} }
+                }, vars.errorList)]"
+                expected="#[null]" />
+            <!-- Non-numeric status code: null -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- resolveStatusCodePassthrough({
+                    errorType: { namespace: 'MULE', identifier: 'UNKNOWN' },
+                    errorMessage: { attributes: { statusCode: 'not-a-number' } }
+                }, vars.errorList)]"
+                expected="#[null]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="get-previous-error-message-edge-cases"
+        description="getPreviousErrorMessage extracts childErrors/suppressedErrors/standard payloads, deduplicates messages, converts Binary and plain text safely, and returns an empty String when there is no nested error.">
+        <munit:behavior>
+            <set-variable
+                variableName="childErrorsMessage"
+                value="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [
+                        { errorMessage: { payload: 'Route 0 failed' } },
+                        { errorMessage: { payload: 'Route 1 failed' } },
+                        { errorMessage: { payload: 'Route 0 failed' } }
+                    ]
+                })]" />
+            <set-variable
+                variableName="suppressedErrorsMessage"
+                value="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [],
+                    suppressedErrors: [
+                        { errorMessage: { payload: { error: { message: 'attempt 1 failed' } } } },
+                        { errorMessage: { payload: { error: { message: 'attempt 2 failed' } } } }
+                    ]
+                })]" />
+        </munit:behavior>
+        <munit:validation>
+            <!-- childErrors: aggregated and deduplicated -->
+            <munit-tools:assert-that
+                expression="#[vars.childErrorsMessage]"
+                is="#[MunitTools::containsString('Route 0 failed')]" />
+            <munit-tools:assert-that
+                expression="#[vars.childErrorsMessage]"
+                is="#[MunitTools::containsString('Route 1 failed')]" />
+            <!-- suppressedErrors: every retry attempt is included -->
+            <munit-tools:assert-that
+                expression="#[vars.suppressedErrorsMessage]"
+                is="#[MunitTools::containsString('attempt 1 failed')]" />
+            <munit-tools:assert-that
+                expression="#[vars.suppressedErrorsMessage]"
+                is="#[MunitTools::containsString('attempt 2 failed')]" />
+            <!-- A single nested message is returned as-is, not wrapped in an array representation -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [ { errorMessage: { payload: 'only failure' } } ]
+                })]"
+                expected="#['only failure']" />
+            <!-- Standard error payload as plain text -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    errorMessage: { payload: 'plain text error body' }
+                })]"
+                expected="#['plain text error body']" />
+            <!-- Standard error payload as Binary does not fail and is read as text -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    errorMessage: { payload: ('binary error body' as Binary) }
+                })]"
+                expected="#['binary error body']" />
+            <!-- No nested errors at all -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({ childErrors: [], suppressedErrors: [], errorMessage: null })]"
+                expected="#['']" />
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage(null)]"
+                expected="#['']" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="get-previous-error-message-structural-edge-cases"
+        description="getPreviousErrorMessage handles structurally inconsistent composites (wayfinder ticket 016): a child with no errorMessage, mixed JSON/text/null/missing payloads, and 4-level nesting.">
+        <munit:validation>
+            <!-- A childError with no errorMessage field is skipped; the sibling with a payload still extracts -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [
+                        { errorMessage: { payload: 'the one real failure' } },
+                        { errorType: { namespace: 'X', identifier: 'NO_MESSAGE' } }
+                    ]
+                })]"
+                expected="#['the one real failure']" />
+            <!-- Mixed payload types (JSON object, text, null, and a child with no payload) aggregate the non-empties without failing -->
+            <munit-tools:assert-that
+                expression="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [
+                        { errorMessage: { payload: { error: { message: 'json failure' } } } },
+                        { errorMessage: { payload: 'text failure' } },
+                        { errorMessage: { payload: null } },
+                        { errorType: { namespace: 'X', identifier: 'NO_MESSAGE' } }
+                    ]
+                })]"
+                is="#[MunitTools::containsString('json failure')]" />
+            <munit-tools:assert-that
+                expression="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [
+                        { errorMessage: { payload: { error: { message: 'json failure' } } } },
+                        { errorMessage: { payload: 'text failure' } },
+                        { errorMessage: { payload: null } },
+                        { errorType: { namespace: 'X', identifier: 'NO_MESSAGE' } }
+                    ]
+                })]"
+                is="#[MunitTools::containsString('text failure')]" />
+            <!-- Drops empties: a composite whose children are all null/missing payloads yields the empty string, not a crash -->
+            <munit-tools:assert-equals
+                actual="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [
+                        { errorMessage: { payload: null } },
+                        { errorType: { namespace: 'X', identifier: 'NO_MESSAGE' } }
+                    ]
+                })]"
+                expected="#['']" />
+            <!-- 4-level nesting (Parallel-Foreach > Scatter-Gather > Validation > leaf): the descendant walk reaches the deep leaf -->
+            <munit-tools:assert-that
+                expression="#[%dw 2.0 import * from module_error_handler_plugin::common --- getPreviousErrorMessage({
+                    childErrors: [ { childErrors: [ { childErrors: [ { errorMessage: { payload: 'deep leaf failure' } } ] } ] } ]
+                })]"
+                is="#[MunitTools::containsString('deep leaf failure')]" />
+        </munit:validation>
+    </munit:test>
+
+</mule>

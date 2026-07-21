@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+    xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+    xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+    xmlns:module-error-handler-plugin="http://www.mulesoft.org/schema/mule/module-error-handler-plugin"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/module-error-handler-plugin http://www.mulesoft.org/schema/mule/module-error-handler-plugin/current/mule-module-error-handler-plugin.xsd">
+
+    <munit:config name="parallel-foreach-test-suite.xml" />
+
+    <!--
+        Real-flow tests for Parallel For-Each composite errors (wayfinder ticket 006).
+        Failing iterations produce a genuine MULE:COMPOSITE_ROUTING with childErrors.
+    -->
+
+    <flow name="pfe-failing-iterations-helper-flow">
+        <parallel-foreach collection="#[[1, 2]]">
+            <validation:is-true expression="#[false]" message="#['Item ' ++ (payload as String) ++ ' failed validation']" />
+        </parallel-foreach>
+    </flow>
+
+    <munit:test
+        name="parallel-foreach-default-resolution-is-unknown-500"
+        description="A real Parallel For-Each composite error (MULE:COMPOSITE_ROUTING) has no default mapping and returns UNKNOWN 500 when resolveNestedErrors is off.">
+        <munit:execution>
+            <try>
+                <flow-ref name="pfe-failing-iterations-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable variableName="testError" value="#[error]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[%dw 2.0 import getErrorTypeAsString from module_error_handler_plugin::common --- getErrorTypeAsString(vars.testError.errorType)]"
+                is="#[MunitTools::equalTo('MULE:COMPOSITE_ROUTING')]" />
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="parallel-foreach-unwrap-resolves-validation-leaves-to-400"
+        description="With resolveNestedErrors=true the failing iterations' VALIDATION:* leaves resolve to 400.">
+        <munit:execution>
+            <try>
+                <flow-ref name="pfe-failing-iterations-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable variableName="testError" value="#[error]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(400)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Bad Request')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="parallel-foreach-previous-error-aggregates-item-failures"
+        description="getPreviousErrorMessage extracts each failing iteration's message from a real childErrors tree.">
+        <munit:execution>
+            <try>
+                <flow-ref name="pfe-failing-iterations-helper-flow" />
+                <error-handler>
+                    <on-error-continue>
+                        <set-variable
+                            variableName="testPreviousError"
+                            value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(error)]" />
+                    </on-error-continue>
+                </error-handler>
+            </try>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[vars.testPreviousError]"
+                is="#[MunitTools::containsString('Item 1 failed validation')]" />
+            <munit-tools:assert-that
+                expression="#[vars.testPreviousError]"
+                is="#[MunitTools::containsString('Item 2 failed validation')]" />
+        </munit:validation>
+    </munit:test>
+
+</mule>

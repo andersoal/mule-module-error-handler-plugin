@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<errorResponse>
+    <code>SVC-0042</code>
+    <summary>Downstream service rejected the request</summary>
+    <details>
+        <detail field="customerId">Customer 8812 is not eligible</detail>
+        <detail field="orderDate">Order date is in the past</detail>
+    </details>
+</errorResponse>

@@ -1,0 +1,714 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+    xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+    xmlns:module-error-handler-plugin="http://www.mulesoft.org/schema/mule/module-error-handler-plugin"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/module-error-handler-plugin http://www.mulesoft.org/schema/mule/module-error-handler-plugin/current/mule-module-error-handler-plugin.xsd">
+
+    <munit:config name="process-error-test-suite.xml" />
+
+    <!--
+        Tests for the process-error operation using serialized Mule error objects captured from real apps
+        (src/test/resources/examples).  They cover the error-shape edge cases:
+        - childErrors     : composite scopes (Scatter-Gather, Parallel For-Each) and Validation "All" aggregation
+        - suppressedErrors: Until-Successful retries
+        - errorMessage payloads that are Objects, plain text (text/plain), or Binary
+    -->
+
+    <munit:test
+        name="scatter-gather-child-errors-map-to-unknown-500"
+        description="A Scatter-Gather composite error (MULE:COMPOSITE_ROUTING with childErrors) has no default mapping and falls back to UNKNOWN 500 with the generated description.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Internal Server Error')]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo(vars.testError.description)]" />
+            <munit-tools:assert-that
+                expression="#[attributes.errorLog]"
+                is="#[MunitTools::containsString('Exception(s) were found for route(s)')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="scatter-gather-child-errors-previous-error-extraction"
+        description="getPreviousErrorMessage extracts the nested route error payload from childErrors and the operation uses it as the response message.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('Error 405 (Method Not Allowed)')]" />
+            <munit-tools:assert-that
+                expression="#[attributes.errorLog]"
+                is="#[MunitTools::containsString('Error 405 (Method Not Allowed)')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="parallel-foreach-child-errors-previous-error-extraction"
+        description="A Parallel For-Each composite error (childErrors) provides the nested route error payload as the previous error.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ParallelForeachError.json", "application/json")]' />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('Error 405 (Method Not Allowed)')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="until-successful-suppressed-errors-previous-error-extraction"
+        description="An Until-Successful error with suppressedErrors aggregates the distinct payloads of every retry attempt.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/UntilSuccessfulSuppressedErrors.json", "application/json")]' />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <!-- MULE:RETRY_EXHAUSTED has no default mapping and falls back to UNKNOWN 500. -->
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('attempt 1')]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('attempt 2')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="text-plain-error-payload-does-not-break-handler"
+        description="An error whose errorMessage.payload is plain text (e.g. an HTML error page) is returned as a String instead of failing the handler.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/UntilSuccessfulError.json", "application/json")]' />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('Error 405 (Method Not Allowed)')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="binary-error-payload-does-not-break-handler"
+        description="An error whose errorMessage.payload is Binary is converted to a String by getPreviousErrorMessage instead of failing on a selector or isEmpty() call.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[%dw 2.0 --- readUrl("classpath://examples/UntilSuccessfulError.json", "application/json") update { case .errorMessage.payload -> ("Binary error body from downstream" as Binary) }]' />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo('Binary error body from downstream')]" />
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="binary-previous-error-parameter-is-converted-to-string"
+        description="Passing a raw Binary value directly as the previousError parameter is converted to a String so the JSON response can be written.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/UntilSuccessfulError.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[("Raw binary previous error" as Binary)]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo('Raw binary previous error')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="multi-validation-child-errors-map-to-validation-wildcard-400"
+        description="A Validation 'All' error (VALIDATION:MULTIPLE with childErrors and a null errorMessage) matches the VALIDATION:* wildcard and returns 400 with the aggregated validation description.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/MultiValidationModuleError.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(400)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Bad Request')]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo(vars.testError.description)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="multi-validation-child-errors-previous-error-aggregates-distinct-messages"
+        description="childErrors from the Validation module aggregate each failed rule's payload once (duplicates from nested causes are removed).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/MultiValidationModuleError.json", "application/json")]' />
+            <set-variable
+                variableName="testPreviousError"
+                value="#[%dw 2.0 import getPreviousErrorMessage from module_error_handler_plugin::common --- getPreviousErrorMessage(vars.testError)]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:previous-error><![CDATA[#[vars.testPreviousError]]]></module-error-handler-plugin:previous-error>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('Muh Error 1!')]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::containsString('Muh Error 2!')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="single-validation-error-maps-to-validation-wildcard-400"
+        description="A single Validation error (VALIDATION:INVALID_BOOLEAN) matches the VALIDATION:* wildcard.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ValidationModuleError.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(400)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo('Muh Error!')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="custom-errors-override-composite-routing"
+        description="A custom error definition for MULE:COMPOSITE_ROUTING overrides the UNKNOWN fallback.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:custom-errors><![CDATA[#[{
+                    "MULE:COMPOSITE_ROUTING": {
+                        code: 502,
+                        reason: "Composite Routing Failure",
+                        message: "One or more parallel routes failed"
+                    }
+                }]]]></module-error-handler-plugin:custom-errors>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(502)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Composite Routing Failure')]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo('One or more parallel routes failed')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="response-key-can-be-renamed-and-removed"
+        description="The responseKey parameter renames the top-level response key; an empty responseKey puts the error fields at the root.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                responseKey="#['errorDetails']" />
+            <set-variable
+                variableName="renamedResponse"
+                value="#[payload]" />
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                responseKey="#['']" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[vars.renamedResponse.errorDetails.code]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.code]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-unwraps-scatter-gather-leaf"
+        description="With resolveNestedErrors=true a Scatter-Gather wrapping a single HTTP:METHOD_NOT_ALLOWED resolves to the leaf's 405 mapping instead of UNKNOWN 500.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(405)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Method Not Allowed')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-unwraps-until-successful-suppressed"
+        description="With resolveNestedErrors=true an Until-Successful (MULE:RETRY_EXHAUSTED) resolves via its suppressedErrors leaf (HTTP:SERVICE_UNAVAILABLE, 503).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/UntilSuccessfulSuppressedErrors.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(503)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Service Unavailable')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-picks-highest-status"
+        description="With mixed leaf types the numeric-max status wins: a 404 and a 503 child resolve to 503.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[%dw 2.0 --- readUrl("classpath://examples/ScatterGather.json", "application/json") update {
+                    case .childErrors -> [
+                        { errorType: { namespace: "HTTP", identifier: "NOT_FOUND" } },
+                        { errorType: { namespace: "HTTP", identifier: "SERVICE_UNAVAILABLE" } }
+                    ]
+                }]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(503)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-beats-custom-composite-entry"
+        description="With resolveNestedErrors=true the unwrapped leaf mapping wins over an explicit customErrors entry for the composite type (wayfinder ticket 003, precedence rule).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true">
+                <module-error-handler-plugin:custom-errors><![CDATA[#[{
+                    "MULE:COMPOSITE_ROUTING": {
+                        code: 502,
+                        reason: "Composite Routing Failure",
+                        message: "One or more parallel routes failed"
+                    }
+                }]]]></module-error-handler-plugin:custom-errors>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(405)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-falls-back-when-no-leaf-resolves"
+        description="When no leaf has a mapping, the composite's own resolution applies (here a customErrors entry for the composite type).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[%dw 2.0 --- readUrl("classpath://examples/ScatterGather.json", "application/json") update {
+                    case .childErrors -> [ { errorType: { namespace: "FOO", identifier: "BAR" } } ]
+                }]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                resolveNestedErrors="true">
+                <module-error-handler-plugin:custom-errors><![CDATA[#[{
+                    "MULE:COMPOSITE_ROUTING": {
+                        code: 502,
+                        reason: "Composite Routing Failure",
+                        message: "One or more parallel routes failed"
+                    }
+                }]]]></module-error-handler-plugin:custom-errors>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(502)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="resolve-nested-errors-defaults-to-off"
+        description="Without the parameter the composite keeps today's behavior (UNKNOWN 500) — backward compatibility.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="propagate-status-code-uses-downstream-status"
+        description="With propagateStatusCode=true a downstream 422 reply (surfacing as MULE:UNKNOWN, captured fixture) responds with the downstream status and reason instead of 500 (wayfinder ticket 014).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/Http422UnprocessableError.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                propagateStatusCode="true" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(422)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Unprocessable Entity')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="propagate-status-code-defaults-to-off"
+        description="Without the parameter a downstream 422 keeps today's behavior (UNKNOWN 500) — backward compatibility.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/Http422UnprocessableError.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="propagate-status-code-yields-to-custom-unknown-entry"
+        description="An explicit custom MULE:UNKNOWN entry beats status-code passthrough — the consumer's stated intent wins.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/Http422UnprocessableError.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                propagateStatusCode="true">
+                <module-error-handler-plugin:custom-errors><![CDATA[#[{
+                    "MULE:UNKNOWN": {
+                        code: 599,
+                        reason: "Custom Unknown",
+                        message: "custom unknown handling"
+                    }
+                }]]]></module-error-handler-plugin:custom-errors>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(599)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="unprocessable-entity-wildcard-maps-to-422"
+        description="An app-raised error with identifier UNPROCESSABLE_ENTITY (any namespace) maps to 422 with the fixed static message (wayfinder tickets 008/012).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{
+                    errorType: { namespace: 'APP', identifier: 'UNPROCESSABLE_ENTITY' },
+                    description: 'row 3 failed business validation'
+                }]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(422)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Unprocessable Entity')]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo('The request was well-formed but could not be processed.')]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="use-generated-error-false-returns-configured-message"
+        description="With useGeneratedError=false the configured static message is returned instead of the error description.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]"
+                useGeneratedError="false" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[payload.error.message]"
+                is="#[MunitTools::equalTo('There is a server issue')]" />
+        </munit:validation>
+    </munit:test>
+
+    <!-- ===== Fatal-error hardening (wayfinder ticket 015) ===== -->
+
+    <munit:test
+        name="corrupted-custom-code-triggers-catastrophic-fallback"
+        description="A misconfigured custom error whose code cannot coerce to a Number would fatal the attributes transform; the operation-body wrapper returns a guaranteed 500 fallback instead of no response.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value='#[readUrl("classpath://examples/ScatterGather.json", "application/json")]' />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]">
+                <module-error-handler-plugin:custom-errors><![CDATA[#[{
+                    "MULE:COMPOSITE_ROUTING": { code: "not-a-number", reason: "Bad", message: "boom" }
+                }]]]></module-error-handler-plugin:custom-errors>
+            </module-error-handler-plugin:process-error>
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[attributes.errorLog]"
+                is="#[MunitTools::containsString('fallback')]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.code]"
+                is="#[MunitTools::equalTo(500)]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="null-error-type-resolves-to-unknown-500-via-normal-path"
+        description="An error object with no errorType resolves to UNKNOWN 500 through the normal path (guarded error-type read), NOT the catastrophic fallback.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{ description: 'no type here' }]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[payload.error.reason]"
+                is="#[MunitTools::equalTo('Internal Server Error')]" />
+            <!-- Distinguishes the guarded normal path from the fallback, which produces an identical 500/reason -->
+            <munit-tools:assert-that
+                expression="#[attributes.errorLog]"
+                is="#[MunitTools::not(MunitTools::containsString('fallback'))]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="empty-error-type-resolves-to-unknown-500-via-normal-path"
+        description="An error whose errorType is an empty object resolves to UNKNOWN 500 through the normal path, not the fallback.">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{ errorType: {}, description: 'empty type' }]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(500)]" />
+            <munit-tools:assert-that
+                expression="#[attributes.errorLog]"
+                is="#[MunitTools::not(MunitTools::containsString('fallback'))]" />
+        </munit:validation>
+    </munit:test>
+
+    <munit:test
+        name="missing-description-does-not-break-handler"
+        description="An error object with no description and no errorMessage resolves normally (guarded description read).">
+        <munit:behavior>
+            <set-variable
+                variableName="testError"
+                value="#[{ errorType: { namespace: 'HTTP', identifier: 'NOT_FOUND' } }]" />
+        </munit:behavior>
+        <munit:execution>
+            <module-error-handler-plugin:process-error
+                error="#[vars.testError]" />
+        </munit:execution>
+        <munit:validation>
+            <munit-tools:assert-that
+                expression="#[attributes.httpStatus]"
+                is="#[MunitTools::equalTo(404)]" />
+        </munit:validation>
+    </munit:test>
+
+</mule>
